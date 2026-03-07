@@ -1,11 +1,12 @@
 package com.hostel.management.modal;
 
+import com.hostel.management.util.Constants;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "roles")
+@Table(name = "roles", schema = Constants.HOSTEL_SCHEMA)
 @Getter
 @Setter
 public class Role {

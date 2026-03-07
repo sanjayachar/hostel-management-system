@@ -1,5 +1,6 @@
 package com.hostel.management.modal;
 
+import com.hostel.management.util.Constants;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -7,7 +8,7 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users", schema = "hostel")
+@Table(name = "users", schema = Constants.HOSTEL_SCHEMA)
 @Getter
 @Setter
 public class User extends CommonEntity {
