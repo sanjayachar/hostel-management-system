@@ -1,3 +1,14 @@
 spring:
   application:
     name: hostel-managment-system
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hostel_management_system
+    username: postgres
+    password: $@nju#29
+    jpa:
+      properties:
+        hibernate:
+          default_schema: hostel
+      hibernate:
+        ddl-auto: none
+      show-sql: true
