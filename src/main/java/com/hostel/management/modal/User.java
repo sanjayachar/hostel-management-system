@@ -15,7 +15,7 @@ public class User extends CommonEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "user_seq")
-    @SequenceGenerator(name = "user_seq", sequenceName = "hostel.users_user_id_seq")
+    @SequenceGenerator(name = "user_seq", sequenceName = "hostel.users_user_id_seq", allocationSize = 1)
     @Column(name = "user_id")
     private Long userId;
 

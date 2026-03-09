@@ -1,5 +1,6 @@
 package com.hostel.management.modal;
 
+import com.hostel.management.enums.RoleEnum;
 import com.hostel.management.util.Constants;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -16,7 +17,10 @@ public class Role {
     @SequenceGenerator(name = "role_seq", sequenceName = "hostel.roles_role_id_seq")
     private Long roleId;
 
-    private String roleName;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, unique = true)
+    private RoleEnum roleName;
 
+    @Column(name = "description")
     private String description;
 }
