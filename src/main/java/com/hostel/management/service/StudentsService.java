@@ -63,7 +63,7 @@ public class StudentsService {
         User user = new User();
         String rawPassword = generatePassword();
         log.info("The new raw password for user {} is {}",studentsDto.getAdmissionNumber(), rawPassword);
-        Role role = roleRepository.findByRoleName(RoleEnum.ROLE_STUDENT.name()).orElseThrow(()->new RuntimeException("Role not found"));
+        Role role = roleRepository.findByRoleName(RoleEnum.ROLE_STUDENT).orElseThrow(()->new RuntimeException("Role not found"));
         user.setUsername(studentsDto.getAdmissionNumber());
         user.setPassword(passwordEncoder.encode(rawPassword));
         user.setRole(role);

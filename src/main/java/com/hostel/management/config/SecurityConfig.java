@@ -42,7 +42,7 @@ public class SecurityConfig {
                 .authenticationProvider(authenticationProvider())
                 .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth->auth
-                        .requestMatchers("/auth/**")
+                        .requestMatchers("/auth/**", "/register/**")
                         .permitAll()
                         .anyRequest()
                         .authenticated())

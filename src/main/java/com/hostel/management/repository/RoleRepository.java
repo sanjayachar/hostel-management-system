@@ -1,10 +1,11 @@
 package com.hostel.management.repository;
 
+import com.hostel.management.enums.RoleEnum;
 import com.hostel.management.modal.Role;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.Optional;
 
 public interface RoleRepository extends JpaRepository<Role, Long> {
-    Optional<Role> findByRoleName(String roleName);
+    Optional<Role> findByRoleName(RoleEnum roleName);
 }

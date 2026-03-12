@@ -32,19 +32,27 @@ public class Staff extends CommonEntity{
     @Column(name = "last_name")
     private String lastName;
 
+    @Column(name = "gender")
     private String gender;
 
+    @Column(name = "date_of_birth")
     private LocalDate dateOfBirth;
 
+    @Column(name = "contact_number")
     private String contactNumber;
 
+    @Column(name = "email")
     private String email;
 
+    @Column(name = "address")
     private String address;
 
+    @Column(name = "designation")
     private String designation;
 
+    @Column(name = "department")
     private String department;
 
+    @Column(name = "date_of_joining")
     private LocalDate dateOfJoining;
 }

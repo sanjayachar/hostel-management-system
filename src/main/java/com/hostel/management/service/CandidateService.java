@@ -1,0 +1,75 @@
+package com.hostel.management.service;
+
+import com.hostel.management.dto.CandidateDto;
+import com.hostel.management.enums.RoleEnum;
+import com.hostel.management.mapper.CandidateMapper;
+import com.hostel.management.modal.Candidate;
+import com.hostel.management.modal.Role;
+import com.hostel.management.modal.User;
+import com.hostel.management.repository.CandidateRepo;
+import com.hostel.management.repository.RoleRepository;
+import com.hostel.management.repository.UserRepository;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class CandidateService {
+    private final CandidateRepo candidateRepo;
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final CandidateMapper candidateMapper;
+    private final PasswordEncoder passwordEncoder;
+
+    public void saveOrUpdateCandidate(@Valid CandidateDto candidateDto) {
+        if (candidateDto.getCandidateId()==null) {
+            registerCandidate(candidateDto);
+        } else {
+            updateCandidate(candidateDto);
+        }
+    }
+    public void registerCandidate(@Valid CandidateDto candidateDto) {
+        User user = saveUserDetails(candidateDto);
+        Candidate candidate = candidateMapper.toEntityForSave(candidateDto);
+        candidate.setUser(user);
+        candidateRepo.save(candidate);
+        /* future mail service */
+    }
+
+    public void updateCandidate(@Valid CandidateDto candidateDto) {
+        Candidate candidate = candidateRepo.findById(candidateDto.getCandidateId()).orElseThrow(()->new RuntimeException("Student Now Found"));
+        candidate.setFirstName(candidateDto.getFirstName());
+        candidate.setLastName(candidateDto.getLastName());
+        candidate.setGender(candidateDto.getGender());
+        candidate.setDateOfBirth(candidateDto.getDateOfBirth());
+        candidate.setContactNumber(candidateDto.getContactNumber());
+        candidate.setEmail(candidateDto.getEmail());
+        candidate.setAddress(candidateDto.getAddress());
+        candidate.setCity(candidateDto.getCity());
+        candidate.setState(candidateDto.getState());
+        candidate.setPinCode(candidateDto.getPinCode());
+        candidate.setAppliedPost(candidateDto.getAppliedPost());
+        candidateRepo.save(candidate);
+    }
+
+    private User saveUserDetails(@Valid CandidateDto candidateDto) {
+        User user = new User();
+        String rawPassword = generatePassword();
+        log.info("The new raw password for user {} is {}",candidateDto.getCandidateId(), rawPassword);
+        Role role = roleRepository.findByRoleName(RoleEnum.ROLE_CANDIDATE).orElseThrow(()->new RuntimeException("Role not found"));
+        user.setUsername(candidateDto.getCandidateCode());
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setRole(role);
+        return userRepository.save(user);
+    }
+
+    private String generatePassword() {
+        return UUID.randomUUID().toString().substring(0, 8);
+    }
+}
