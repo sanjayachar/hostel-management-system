@@ -1,6 +1,7 @@
 package com.hostel.management.controller.candidate;
 
 import com.hostel.management.dto.AccommodationRequestDto;
+import com.hostel.management.enums.RoleEnum;
 import com.hostel.management.modal.User;
 import com.hostel.management.service.AccommodationService;
 import com.hostel.management.util.SecurityContextUtil;
@@ -19,7 +20,8 @@ public class CandidateController {
     @GetMapping("/request/list")
     public ResponseEntity<?> getRequestList() {
         String role = SecurityContextUtil.getRole();
-        return ResponseEntity.ok(accommodationService.getRequetList(role));
+        RoleEnum roleEnum = RoleEnum.valueOf(role);
+        return ResponseEntity.ok(accommodationService.getRequetList(roleEnum));
     }
 
     @PostMapping("/request")

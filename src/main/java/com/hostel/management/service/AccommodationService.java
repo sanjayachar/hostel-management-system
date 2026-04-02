@@ -13,6 +13,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 
@@ -53,6 +55,7 @@ public class AccommodationService {
         request.setToDate(dto.getToDate());
         request.setNoOfDays(dto.getNoOfDays());
         request.setNoOfPersons(dto.getNoOfPersons());
+        request.setStatus("Pending");
         User user = SecurityContextUtil.getUser();
         String role = SecurityContextUtil.getRole();
         if (user == null || role == null) {
@@ -63,13 +66,24 @@ public class AccommodationService {
         accommodationRequestsRepository.save(request);
     }
 
-    public List<AccommodationRequestDto> getRequetList(String userRole) {
-        RoleEnum roleEnum = RoleEnum.valueOf(userRole);
+    public List<AccommodationRequestDto> getRequetList(RoleEnum roleEnum) {
         List<AccommodationRequestDto> accommodationRequestDtoList = accommodationRequestsRepository.findAllByUserRoleAndActiveFlag(roleEnum, Constants.ACTIVE)
                 .orElse(Collections.emptyList())
                 .stream()
                 .map(accommodationRequestMapper::toDto)
                 .toList();
         return accommodationRequestDtoList;
+    }
+
+    @Transactional
+    public String updateAccommodationRequestStatus(AccommodationRequestDto accommodationRequestDto) {
+        AccommodationRequests accommodationRequests = accommodationRequestsRepository
+                .findByRequestIdAndActiveFlag(accommodationRequestDto.getRequestId(), Constants.ACTIVE)
+                .orElseThrow(()->new ResourceNotFoundException("Accommodation Request Not found."));
+        accommodationRequests.setStatus(accommodationRequestDto.getStatus());
+        accommodationRequests.setModifiedAt(LocalDateTime.now());
+        accommodationRequests.setModifiedBy(SecurityContextUtil.getUsername());
+        accommodationRequestsRepository.save(accommodationRequests);
+        return accommodationRequestDto.getStatus();
     }
 }

@@ -1,15 +1,14 @@
 package com.hostel.management.controller.staff;
 
 import com.hostel.management.dto.AccommodationRequestDto;
+import com.hostel.management.enums.RoleEnum;
 import com.hostel.management.service.AccommodationService;
 import com.hostel.management.service.StaffService;
+import com.hostel.management.util.SecurityContextUtil;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/staff")
@@ -22,5 +21,12 @@ public class StaffController {
     public ResponseEntity<?> saveOrUpdateStudentAccommodation(@Valid @RequestBody AccommodationRequestDto accommodationRequestDto) {
         accommodationService.saveOrUpdateAccommodation(accommodationRequestDto);
         return ResponseEntity.ok("Staff accommodation saved/updated successfully");
+    }
+
+    @GetMapping("/request/list")
+    public ResponseEntity<?> getRequestList() {
+        String role = SecurityContextUtil.getRole();
+        RoleEnum roleEnum = RoleEnum.valueOf(role);
+        return ResponseEntity.ok(accommodationService.getRequetList(roleEnum));
     }
 }
