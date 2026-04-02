@@ -1,5 +1,5 @@
 jwt:
-  secrete: RrURV5twHjsX+LPK3MfI67swocN972ymHopqr3rAANw=
+  secret: RrURV5twHjsX+LPK3MfI67swocN972ymHopqr3rAANw=
   expiration: 86400000
 server:
   port: 8083

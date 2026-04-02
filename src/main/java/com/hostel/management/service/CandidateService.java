@@ -2,6 +2,7 @@ package com.hostel.management.service;
 
 import com.hostel.management.dto.CandidateDto;
 import com.hostel.management.enums.RoleEnum;
+import com.hostel.management.exception.ResourceNotFoundException;
 import com.hostel.management.mapper.CandidateMapper;
 import com.hostel.management.modal.Candidate;
 import com.hostel.management.modal.Role;
@@ -9,13 +10,16 @@ import com.hostel.management.modal.User;
 import com.hostel.management.repository.CandidateRepo;
 import com.hostel.management.repository.RoleRepository;
 import com.hostel.management.repository.UserRepository;
+import com.hostel.management.util.Constants;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -61,7 +65,7 @@ public class CandidateService {
     private User saveUserDetails(@Valid CandidateDto candidateDto) {
         User user = new User();
         String rawPassword = generatePassword();
-        log.info("The new raw password for user {} is {}",candidateDto.getCandidateId(), rawPassword);
+        log.info("The new raw password for user {} is {}",candidateDto.getCandidateCode(), rawPassword);
         Role role = roleRepository.findByRoleName(RoleEnum.ROLE_CANDIDATE).orElseThrow(()->new RuntimeException("Role not found"));
         user.setUsername(candidateDto.getCandidateCode());
         user.setPassword(passwordEncoder.encode(rawPassword));
@@ -71,5 +75,19 @@ public class CandidateService {
 
     private String generatePassword() {
         return UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    public List<CandidateDto> getCandidateList() {
+        return candidateRepo.findAll().stream().map(candidateMapper::toDto).collect(Collectors.toList());
+    }
+
+    public CandidateDto getCandidateById(Long candidateId) {
+        CandidateDto candidateDto = candidateRepo.findByCandidateIdAndActiveFlag(candidateId, Constants.ACTIVE).map(candidateMapper::toDto).orElseThrow(()->new ResourceNotFoundException("Candidate Not Found"));
+        return candidateDto;
+    }
+
+    public CandidateDto getCandidateByCandidateCode(String candidateCode) {
+        CandidateDto candidateDto = candidateRepo.findByCandidateCodeAndActiveFlag(candidateCode, Constants.ACTIVE).map(candidateMapper::toDto).orElseThrow(()->new ResourceNotFoundException("Candidate Not Found"));
+        return candidateDto;
     }
 }

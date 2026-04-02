@@ -1,5 +1,7 @@
 package com.hostel.management.config;
 
+import com.hostel.management.exception.CustomAccessDeniedHandler;
+import com.hostel.management.exception.CustomAuthenticationEntryPoint;
 import com.hostel.management.security.JwtAuthenticationFilter;
 import com.hostel.management.service.CustomUserDetailsService;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,8 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService customUserDetailsService;
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
+    private final CustomAccessDeniedHandler customAccessDeniedHandler;
 
     @Bean
     public PasswordEncoder passwordEncoder(){
@@ -39,11 +43,21 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity httpSecurity) throws Exception {
         return httpSecurity
                 .csrf(AbstractHttpConfigurer::disable)
+                .logout(AbstractHttpConfigurer::disable)
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(customAuthenticationEntryPoint)
+                        .accessDeniedHandler(customAccessDeniedHandler))
                 .authenticationProvider(authenticationProvider())
                 .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth->auth
-                        .requestMatchers("/auth/**", "/register/**")
-                        .permitAll()
+                        /* PUBLIC APIs */
+                        .requestMatchers("/auth/**", "/public/**").permitAll()
+                        /* USER DASHBOARD APIs */
+                        .requestMatchers("/student/**").hasRole("STUDENT")
+                        .requestMatchers("/staff/**").hasRole("STAFF")
+                        .requestMatchers("/candidate/**").hasRole("CANDIDATE")
+                        /* ADMIN MANAGEMENT */
+                        .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest()
                         .authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)

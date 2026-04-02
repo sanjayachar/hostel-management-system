@@ -22,7 +22,7 @@ public class StudentsDto {
     private String lastName;
     @NotBlank(message = "Student gender is required.")
     private String gender;
-    @NotBlank(message = "Student date of birth is required.")
+    @NotNull(message = "Student date of birth is required.")
     @MinimumAge(value = 20)
     private LocalDate dateOfBirth;
     @NotBlank(message = "Student contact number is required.")
