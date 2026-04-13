@@ -9,7 +9,7 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.hostel</groupId>
-	<artifactId>hostel-managment-system</artifactId>
+	<artifactId>hostel-management-system</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>hostel-managment-system</name>
 	<description>hostel-managment-system</description>
@@ -109,6 +109,12 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-aop</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>2.5.0</version>
 		</dependency>
 	</dependencies>
 
