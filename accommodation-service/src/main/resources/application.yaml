@@ -1,0 +1,28 @@
+jwt:
+  secret: RrURV5twHjsX+LPK3MfI67swocN972ymHopqr3rAANw=
+  expiration: 86400000
+
+server:
+  port: 8082
+  servlet:
+    context-path: /accomm-service-api
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hostel_management_system
+    username: postgres
+    password: $@nju#29
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+grpc:
+  server:
+    security:
+      enabled: false

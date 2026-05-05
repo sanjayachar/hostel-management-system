@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package accommodation;
+
+option java_package = "com.hostel.proto.accommodation";
+option java_multiple_files = true;
+
+service AccommodationService {
+
+  rpc GetRequests (AccommodationRequestList) returns (AccommodationResponseList);
+
+  rpc SaveRequest (SaveAccommodationRequest) returns (SaveAccommodationResponse);
+}
+
+message AccommodationRequestList {
+  string role = 1;
+}
+
+message AccommodationResponse {
+  int64 id = 1;
+  string studentName = 2;
+  string room = 3;
+}
+
+message AccommodationResponseList {
+  repeated AccommodationResponse list = 1;
+}
+
+message SaveAccommodationRequest {
+  string requestType = 1;
+  string reason = 2;
+  string fromDate = 3;
+  string toDate = 4;
+  int32 noOfDays = 5;
+  int32 noOfPersons = 6;
+  int64 userId = 7;
+  string userRole = 8;
+  string token = 9;
+}
+
+message SaveAccommodationResponse {
+  string message = 1;
+}

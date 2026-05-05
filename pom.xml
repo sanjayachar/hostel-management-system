@@ -117,7 +117,12 @@
 			<version>2.5.0</version>
 		</dependency>
 	</dependencies>
-
+	<modules>
+		<module>hostel-proto</module>
+		<module>student-service</module>
+		<module>auth-service</module>
+		<module>accommodation-service</module>
+	</modules>
 	<build>
 		<plugins>
 			<plugin>
