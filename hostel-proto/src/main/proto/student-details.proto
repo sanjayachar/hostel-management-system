@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package student_details;
+
+option java_package = "com.hostel.proto.student_details";
+option java_multiple_files = true;
+
+service StudentDetailsService {
+  rpc GetRequests (StudentDetailsRequestList) returns (StudentDetailsResponseList);
+  rpc GetRequest (StudentDetailsRequest) returns (StudentDetailsResponse);
+}
+
+message StudentDetailsRequestList {
+  string role = 1;
+}
+
+message StudentDetailsRequest {
+  string role = 1;
+  int64 studentId = 2;
+}
+
+message StudentDetailsResponse {
+  int64 studentId = 1;
+  string admissionNumber = 2;
+  string firstName = 3;
+  string lastName = 4;
+  string gender = 5;
+  string dateOfBirth = 6;
+  string contactNumber = 7;
+  string personalEmail = 8;
+  string fatherName = 9;
+  string motherName = 10;
+  string address = 11;
+  bool hostelStatus = 12;
+  int64 userId = 13;
+}
+
+message StudentDetailsResponseList {
+  repeated StudentDetailsResponse list = 1;
+}

@@ -16,7 +16,7 @@ public class AccommodationClient {
 
     private final AccommodationMapper accommodationMapper;
 
-    @GrpcClient("auth-service")
+    @GrpcClient("accommodation-service")
     private AccommodationServiceGrpc.AccommodationServiceBlockingStub stub;
 
     public List<AccommodationRequestDto> getRequests(String role) {

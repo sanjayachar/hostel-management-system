@@ -23,9 +23,14 @@ public class AccommodationGrpcService extends AccommodationServiceGrpc.Accommoda
         AccommodationResponseList.Builder responseBuilder = AccommodationResponseList.newBuilder();
         for (AccommodationRequestDto dto : list) {
             AccommodationResponse response = AccommodationResponse.newBuilder()
-                    .setId(dto.getRequestId())
-                    .setStudentName(dto.getReason())
-                    .setRoom(dto.getStatus())
+                    .setRequestId(dto.getRequestId())
+                    .setReason(dto.getReason())
+                    .setStatus(dto.getStatus())
+                    .setFromDate(String.valueOf(dto.getFromDate()))
+                    .setToDate(String.valueOf(dto.getToDate()))
+                    .setNoOfDays(dto.getNoOfDays())
+                    .setNoOfPersons(dto.getNoOfPersons())
+                    .setUserRole(dto.getUserRole().name())
                     .build();
             responseBuilder.addList(response);
         }

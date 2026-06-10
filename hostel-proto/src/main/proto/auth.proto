@@ -6,7 +6,12 @@ option java_package = "com.hostel.proto.auth";
 option java_multiple_files = true;
 
 service AuthService {
+
+  // CREATE USER
   rpc CreateUser (CreateUserRequest) returns (CreateUserResponse);
+
+  // COMPENSATION ROLLBACK
+  rpc DeleteUser (DeleteUserRequest)returns (DeleteUserResponse);
 }
 
 message CreateUserRequest {
@@ -17,4 +22,13 @@ message CreateUserRequest {
 
 message CreateUserResponse {
   int64 userId = 1;
+}
+
+
+message DeleteUserRequest {
+  int64 userId = 1;
+}
+
+message DeleteUserResponse {
+  string message = 1;
 }

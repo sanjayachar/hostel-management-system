@@ -19,20 +19,29 @@ spring:
     url: jdbc:postgresql://localhost:5432/hostel_management_system
     username: postgres
     password: $@nju#29
-    jpa:
-      properties:
-        hibernate:
-          default_schema: hostel
-      hibernate:
-        ddl-auto: none
-      show-sql: true
 
-grpcs:
+  jpa:
+    properties:
+      hibernate:
+        default_schema: hostel
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
+grpc:
+  server:
+    port: 9094
+    security:
+      enabled: false
   client:
     auth-service:
-      address: static://localhost:8081
+      address: static://localhost:9093
       negotiationType: plaintext
 
     accommodation-service:
-      address: static://localhost:8082
+      address: static://localhost:9092
+      negotiationType: plaintext
+
+    staff-service:
+      address: static://localhost:9091
       negotiationType: plaintext

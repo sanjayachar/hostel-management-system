@@ -1,0 +1,47 @@
+jwt:
+  secret: RrURV5twHjsX+LPK3MfI67swocN972ymHopqr3rAANw=
+  expiration: 86400000
+server:
+  port: 8084
+  servlet:
+    context-path: /staff-service-api
+logging:
+  level:
+    org.springframework.security: DEBUG
+spring:
+  application:
+    name: hostel-managment-system
+  data:
+    redis:
+      host: localhost
+      port: 6379
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hostel_management_system
+    username: postgres
+    password: $@nju#29
+
+  jpa:
+    properties:
+      hibernate:
+        default_schema: hostel
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
+grpc:
+  server:
+    port: 9091
+    security:
+      enabled: false
+  client:
+    auth-service:
+      address: static://localhost:9093
+      negotiationType: plaintext
+
+    accommodation-service:
+      address: static://localhost:9092
+      negotiationType: plaintext
+
+    student-service:
+      address: static://localhost:9094
+      negotiationType: plaintext

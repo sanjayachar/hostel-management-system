@@ -24,5 +24,6 @@ spring:
 
 grpc:
   server:
+    port : 9092
     security:
       enabled: false

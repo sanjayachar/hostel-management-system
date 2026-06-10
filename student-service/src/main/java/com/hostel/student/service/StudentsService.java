@@ -46,10 +46,25 @@ public class StudentsService {
         }
     }
     public void registerStudent(StudentsDto studentsDto) {
-        Long userId = saveUserDetails(studentsDto);
-        Students students = studentMapper.toEntityForSave(studentsDto);
-        students.setUserId(userId);
-        studentRepo.save(students);
+        Long userId = null;
+        try {
+            userId = saveUserDetails(studentsDto);
+            // INTENTIONAL FAILURE
+            throw new RuntimeException("Testing Saga Rollback");
+            /*Students students = studentMapper.toEntityForSave(studentsDto);
+            students.setUserId(userId);
+            studentRepo.save(students);*/
+        } catch (Exception e) {
+            if (userId != null) {
+                try {
+                    authClient.deleteUser(userId);
+                    log.info("Rollback success for user {}", userId);
+                } catch (Exception rollbackEx) {
+                    log.error("Rollback failed for user {}", userId, rollbackEx);
+                }
+            }
+            throw new RuntimeException("Student registration failed", e);
+        }
         /* future mail service */
     }
 
@@ -73,7 +88,7 @@ public class StudentsService {
         log.info("The new raw password for user {} is {}",studentsDto.getAdmissionNumber(), rawPassword);
         Long userId = authClient.createUser(
                 studentsDto.getAdmissionNumber(),
-                passwordEncoder.encode(rawPassword),
+                rawPassword,
                 RoleEnum.ROLE_STUDENT.name()
         );
         return userId;

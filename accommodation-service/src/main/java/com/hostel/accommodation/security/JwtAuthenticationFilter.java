@@ -35,6 +35,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         if (jwtService.validateToken(jwt)) {
             Long userId = jwtService.extractUserId(jwt);
             Integer tokenVersion = jwtService.extractTokenVersion(jwt);
+            String userName = jwtService.extractUsername(jwt);
             Integer cachedVersion = Integer.valueOf(Objects.requireNonNull(stringRedisTemplate.opsForValue().get("tokenVersion:" + userId)));
             if (!cachedVersion.equals(tokenVersion)) {
                 filterChain.doFilter(request, response);
@@ -43,7 +44,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String role = jwtService.extractRole(jwt);
             List<GrantedAuthority> authorities = List.of(new SimpleGrantedAuthority(role));
             System.out.println("Role from token: " + role);
-            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(userId, jwt, authorities);
+            UserPrincipal userPrincipal = new UserPrincipal(userId, userName, role);
+            UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(userPrincipal, jwt, authorities);
             SecurityContextHolder.getContext().setAuthentication(authToken);
         }
         filterChain.doFilter(request, response);

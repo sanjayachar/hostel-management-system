@@ -17,9 +17,16 @@ message AccommodationRequestList {
 }
 
 message AccommodationResponse {
-  int64 id = 1;
-  string studentName = 2;
-  string room = 3;
+  int64 requestId = 1;
+  string requestType = 2;
+  string reason = 3;
+  string fromDate = 4;
+  string toDate = 5;
+  int32 noOfDays = 6;
+  int32 noOfPersons = 7;
+  string status = 8;
+  int64 userId = 9;
+  string userRole = 10;
 }
 
 message AccommodationResponseList {

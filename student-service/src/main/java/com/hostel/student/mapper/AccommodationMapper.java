@@ -5,10 +5,7 @@ import com.hostel.student.dto.AccommodationRequestDto;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
-@Mapper
+@Mapper(componentModel = "spring")
 public interface AccommodationMapper {
-
-    @Mapping(source = "id", target = "requestId")
-    @Mapping(source = "room", target = "status")
     AccommodationRequestDto toDto(AccommodationResponse accommodationResponse);
 }

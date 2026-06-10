@@ -1,0 +1,9 @@
+spring:
+  application:
+    name: chat-service
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hostel_management_system
+    username: postgres
+    password: $@nju#29
+server:
+  port: 8085
