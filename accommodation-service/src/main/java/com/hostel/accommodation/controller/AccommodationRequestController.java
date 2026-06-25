@@ -2,7 +2,9 @@ package com.hostel.accommodation.controller;
 
 import com.hostel.accommodation.common.enums.RoleEnum;
 import com.hostel.accommodation.dto.AccommodationRequestDto;
+import com.hostel.accommodation.dto.RequestDecisionDto;
 import com.hostel.accommodation.service.AccommodationService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,5 +34,14 @@ public class AccommodationRequestController {
     public ResponseEntity<?> approveAccommodationRequest(@RequestBody AccommodationRequestDto accommodationRequestDto) {
         String status = accommodationService.updateAccommodationRequestStatus(accommodationRequestDto);
         return ResponseEntity.ok(status + " successfully.!");
+    }
+
+    @PostMapping("/{requestId}/decision")
+    public ResponseEntity<?> decideAccommodationRequest(
+            @PathVariable Long requestId,
+            @Valid @RequestBody RequestDecisionDto decisionDto
+    ) {
+        decisionDto.setRequestId(requestId);
+        return ResponseEntity.ok(accommodationService.decideAccommodationRequest(decisionDto));
     }
 }

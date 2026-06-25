@@ -9,6 +9,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "requests", schema = Constants.HOSTEL_SCHEMA)
@@ -28,6 +29,15 @@ public class AccommodationRequests extends CommonEntity {
     private Integer noOfDays;
     private Integer noOfPersons;
     private String status;
+
+    @Column(name = "decision_note")
+    private String decisionNote;
+
+    @Column(name = "decided_by")
+    private String decidedBy;
+
+    @Column(name = "decided_at")
+    private LocalDateTime decidedAt;
 
     @Column(name = "user_id", nullable = false)
     private Long userId;

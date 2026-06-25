@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface AccommodationRequestsRepository extends JpaRepository<AccommodationRequests, Long> {
     Optional<AccommodationRequests> findByRequestIdAndActiveFlag(Long requestId, String activeFlag);
     Optional<List<AccommodationRequests>> findAllByUserRoleAndActiveFlag(RoleEnum userRole, String activeFlag);
+    Optional<List<AccommodationRequests>> findAllByUserRoleAndUserIdAndActiveFlag(RoleEnum userRole, Long userId, String activeFlag);
 }

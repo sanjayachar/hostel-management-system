@@ -9,6 +9,8 @@ import com.hostel.student.common.exception.ResourceNotFoundException;
 import com.hostel.student.common.util.Constants;
 import com.hostel.student.common.util.SecurityContextUtil;
 import com.hostel.student.dto.AccommodationRequestDto;
+import com.hostel.student.dto.EmailNotificationApplicationEvent;
+import com.hostel.student.dto.EmailNotificationEvent;
 import com.hostel.student.dto.StudentsDto;
 import com.hostel.student.entity.Students;
 import com.hostel.student.mapper.StudentMapper;
@@ -16,13 +18,17 @@ import com.hostel.student.repository.StudentRepo;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
+import java.time.Year;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -36,6 +42,7 @@ public class StudentsService {
     private final ServiceCall serviceCall;
     private final AuthClient authClient;
     private final AccommodationClient accommodationClient;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Transactional
     public void saveOrUpdateStudent(StudentsDto studentsDto) {
@@ -49,11 +56,25 @@ public class StudentsService {
         Long userId = null;
         try {
             userId = saveUserDetails(studentsDto);
-            // INTENTIONAL FAILURE
-            throw new RuntimeException("Testing Saga Rollback");
-            /*Students students = studentMapper.toEntityForSave(studentsDto);
+            Students students = studentMapper.toEntityForSave(studentsDto);
             students.setUserId(userId);
-            studentRepo.save(students);*/
+            studentRepo.save(students);
+            EmailNotificationEvent emailEvent = new EmailNotificationEvent(
+                    UUID.randomUUID().toString(),
+                    "USER_CREATED",
+                    "USER_CREATED",
+                    userId,
+                    "ROLE_STUDENT",
+                    studentsDto.getPersonalEmail(),
+                    studentsDto.getFirstName() + " " + studentsDto.getLastName(),
+                    null,
+                    "student-service",
+                    "STUDENT",
+                    students.getStudentId(),
+                    Map.of("username", studentsDto.getAdmissionNumber()),
+                    LocalDateTime.now()
+            );
+            applicationEventPublisher.publishEvent(new EmailNotificationApplicationEvent(emailEvent));
         } catch (Exception e) {
             if (userId != null) {
                 try {
@@ -65,7 +86,6 @@ public class StudentsService {
             }
             throw new RuntimeException("Student registration failed", e);
         }
-        /* future mail service */
     }
 
     public void updateStudent(StudentsDto studentsDto) {
@@ -113,7 +133,14 @@ public class StudentsService {
     }
 
     public List<AccommodationRequestDto> getStudentsAccommodationRequest(RoleEnum roleEnum) {
-        return accommodationClient.getRequests(roleEnum.name());
+        return accommodationClient.getRequests(roleEnum.name(), SecurityContextUtil.getUserId());
+    }
+
+    public String getNextAdmissionNumber() {
+        String prefix = "STU" + Year.now().getValue();
+        Integer maxSuffix = studentRepo.findMaxAdmissionNumberSuffix(prefix);
+        int nextSuffix = (maxSuffix == null ? 0 : maxSuffix) + 1;
+        return prefix + String.format("%03d", nextSuffix);
     }
 
     public ResponseEntity<?> saveOrUpdateAccommodation(@Valid AccommodationRequestDto accommodationRequestDto) {

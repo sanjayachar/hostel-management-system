@@ -19,8 +19,11 @@ public class AccommodationClient {
     @GrpcClient("accommodation-service")
     private AccommodationServiceGrpc.AccommodationServiceBlockingStub stub;
 
-    public List<AccommodationRequestDto> getRequests(String role) {
-        AccommodationRequestList requestList = AccommodationRequestList.newBuilder().setRole(role).build();
+    public List<AccommodationRequestDto> getRequests(String role, Long userId) {
+        AccommodationRequestList requestList = AccommodationRequestList.newBuilder()
+                .setRole(role)
+                .setUserId(userId == null ? 0 : userId)
+                .build();
         AccommodationResponseList responseList = stub.getRequests(requestList);
         return responseList.getListList().stream().map(accommodationMapper::toDto).collect(Collectors.toList());
     }

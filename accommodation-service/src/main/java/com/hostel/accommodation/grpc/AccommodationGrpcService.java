@@ -19,20 +19,43 @@ public class AccommodationGrpcService extends AccommodationServiceGrpc.Accommoda
     @Override
     public void getRequests(AccommodationRequestList request, StreamObserver<AccommodationResponseList> responseObserver) {
         RoleEnum roleEnum = RoleEnum.valueOf(request.getRole());
-        List<AccommodationRequestDto> list = accommodationService.getRequetList(roleEnum);
+        List<AccommodationRequestDto> list = request.getUserId() > 0
+                ? accommodationService.getRequestListByUser(roleEnum, request.getUserId())
+                : accommodationService.getRequetList(roleEnum);
         AccommodationResponseList.Builder responseBuilder = AccommodationResponseList.newBuilder();
         for (AccommodationRequestDto dto : list) {
-            AccommodationResponse response = AccommodationResponse.newBuilder()
+            AccommodationResponse.Builder response = AccommodationResponse.newBuilder()
                     .setRequestId(dto.getRequestId())
-                    .setReason(dto.getReason())
-                    .setStatus(dto.getStatus())
+                    .setRequestType(dto.getRequestType() == null ? "" : dto.getRequestType())
+                    .setReason(dto.getReason() == null ? "" : dto.getReason())
+                    .setStatus(dto.getStatus() == null ? "" : dto.getStatus())
                     .setFromDate(String.valueOf(dto.getFromDate()))
                     .setToDate(String.valueOf(dto.getToDate()))
                     .setNoOfDays(dto.getNoOfDays())
                     .setNoOfPersons(dto.getNoOfPersons())
-                    .setUserRole(dto.getUserRole().name())
-                    .build();
-            responseBuilder.addList(response);
+                    .setUserRole(dto.getUserRole() == null ? "" : dto.getUserRole().name())
+                    .setDecisionNote(dto.getDecisionNote() == null ? "" : dto.getDecisionNote())
+                    .setRequesterCode(dto.getRequesterCode() == null ? "" : dto.getRequesterCode())
+                    .setRequesterName(dto.getRequesterName() == null ? "" : dto.getRequesterName())
+                    .setHostelName(dto.getHostelName() == null ? "" : dto.getHostelName())
+                    .setRoomNumber(dto.getRoomNumber() == null ? "" : dto.getRoomNumber())
+                    .setBedNumber(dto.getBedNumber() == null ? "" : dto.getBedNumber())
+                    .setAllocationStatus(dto.getAllocationStatus() == null ? "" : dto.getAllocationStatus());
+
+            if (dto.getUserId() != null) {
+                response.setUserId(dto.getUserId());
+            }
+            if (dto.getAllocationId() != null) {
+                response.setAllocationId(dto.getAllocationId());
+            }
+            if (dto.getHostelId() != null) {
+                response.setHostelId(dto.getHostelId());
+            }
+            if (dto.getRoomId() != null) {
+                response.setRoomId(dto.getRoomId());
+            }
+
+            responseBuilder.addList(response.build());
         }
         responseObserver.onNext(responseBuilder.build());
         responseObserver.onCompleted();

@@ -1,15 +1,16 @@
 package com.hostel.chatservice.dto;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.time.LocalDateTime;
+import java.util.List;
 
-@Getter
-@Setter
-public class ChatMessageDto {
-    private String sender;
-    private String receiver;
-    private String message;
-    private LocalDateTime timestamp;
+public record ChatMessageDto(
+        Long messageId,
+        Long roomId,
+        Long senderUserId,
+        String senderUsername,
+        String senderRole,
+        String message,
+        List<ChatMentionDto> mentions,
+        LocalDateTime createdAt
+) {
 }

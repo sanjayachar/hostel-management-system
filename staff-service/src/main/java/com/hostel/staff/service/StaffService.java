@@ -20,6 +20,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.Year;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -45,11 +46,9 @@ public class StaffService {
         Long userId = null;
         try {
             userId = saveUserDetails(staffDto);
-            // INTENTIONAL FAILURE
-            throw new RuntimeException("Testing Saga Rollback");
-            /*Staff staff = staffMapper.toEntityForSave(staffDto);
+            Staff staff = staffMapper.toEntityForSave(staffDto);
             staff.setUserId(userId);
-            staffRepo.save(staff);*/
+            staffRepo.save(staff);
         } catch (Exception e) {
             if (userId != null) {
                 try {
@@ -98,6 +97,13 @@ public class StaffService {
         return staffRepo.findAll().stream().map(staffMapper::toDto).collect(Collectors.toList());
     }
 
+    public String getNextEmployeeCode() {
+        String prefix = "EMP" + Year.now().getValue();
+        Integer maxSuffix = staffRepo.findMaxEmployeeCodeSuffix(prefix);
+        int nextSuffix = (maxSuffix == null ? 0 : maxSuffix) + 1;
+        return prefix + String.format("%03d", nextSuffix);
+    }
+
     public StaffDto getStaffById(Long staffId) {
         StaffDto staffDto = staffRepo.findByStaffIdAndActiveFlag(staffId, Constants.ACTIVE).map(staffMapper::toDto).orElseThrow(()->new ResourceNotFoundException("Staff not found."));
         return staffDto;
@@ -108,7 +114,7 @@ public class StaffService {
     }
 
     public List<AccommodationRequestDto> getStaffsAccommodationRequest(RoleEnum roleEnum) {
-        return accommodationClient.getRequests(roleEnum.name());
+        return accommodationClient.getRequests(roleEnum.name(), SecurityContextUtil.getUserId());
     }
 
     public void saveOrUpdateAccommodation(@Valid AccommodationRequestDto accommodationRequestDto) {

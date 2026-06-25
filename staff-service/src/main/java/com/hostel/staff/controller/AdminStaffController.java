@@ -27,6 +27,11 @@ public class AdminStaffController {
         return ResponseEntity.ok(staffService.getAllStaffs());
     }
 
+    @GetMapping("/next-employee-code")
+    public ResponseEntity<?> getNextEmployeeCode() {
+        return ResponseEntity.ok(staffService.getNextEmployeeCode());
+    }
+
     @GetMapping("/view/{staffId}")
     public ResponseEntity<?> getStaffDetails(@PathVariable Long staffId) {
         return ResponseEntity.ok(staffService.getStaffById(staffId));

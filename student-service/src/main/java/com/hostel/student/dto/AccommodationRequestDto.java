@@ -27,6 +27,16 @@ public class AccommodationRequestDto {
     @NotNull(message = "Number of persons is required.")
     private Integer noOfPersons;
     private String status;
+    private String decisionNote;
     private Long userId;
     private RoleEnum userRole;
+    private String requesterCode;
+    private String requesterName;
+    private Long allocationId;
+    private Long hostelId;
+    private String hostelName;
+    private Long roomId;
+    private String roomNumber;
+    private String bedNumber;
+    private String allocationStatus;
 }

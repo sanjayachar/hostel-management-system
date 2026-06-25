@@ -1,0 +1,58 @@
+hostel:
+  email:
+    topic: hostel.email.notifications
+spring:
+  application:
+    name: email-service
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hostel_management_system
+    username: postgres
+    password: $@nju#29
+
+  jpa:
+    properties:
+      hibernate:
+        default_schema: hostel
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
+  kafka:
+    bootstrap-servers: localhost:29092
+    consumer:
+      group-id: email-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        spring.json.value.default.type: com.email.emailservice.dto.EmailNotificationEvent
+
+  mail:
+    host: localhost
+    port: 1025
+    username:
+    password:
+    properties:
+      mail:
+        smtp:
+          auth: false
+          starttls:
+            enable: false
+
+#    host: smtp.gmail.com
+#      port: 587
+#      username: your-email@gmail.com
+#      password: your-app-password
+#      properties:
+#        mail:
+#          smtp:
+#            auth: true
+#            starttls:
+#              enable
+
+server:
+  port: 8088
+  servlet:
+    context-path: /email-service-api

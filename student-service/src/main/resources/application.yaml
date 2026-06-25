@@ -8,6 +8,11 @@ server:
 logging:
   level:
     org.springframework.security: DEBUG
+hostel:
+  audit:
+    topic: hostel.audit.logs
+  email:
+    topic: hostel.email.notifications
 spring:
   application:
     name: hostel-managment-system
@@ -27,6 +32,13 @@ spring:
     hibernate:
       ddl-auto: none
     show-sql: true
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
 
 grpc:
   server:
