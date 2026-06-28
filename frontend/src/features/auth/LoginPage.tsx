@@ -3,7 +3,14 @@ import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import axios from "axios";
 import { HostelLogo } from "../../components/brand/HostelLogo";
 import { login } from "./authApi";
-import { getCurrentUser, getDashboardPath, type UserRole } from "../../lib/auth";
+import {
+    clearAuthState,
+    getCurrentUser,
+    getDashboardPath,
+    isPasswordChangeRequired,
+    setPasswordChangeRequired,
+    type UserRole
+} from "../../lib/auth";
 import "../../assets/css/LoginPage.css";
 import "../../assets/css/PublicPages.css";
 
@@ -41,6 +48,10 @@ export function LoginPage() {
     const loginConfig = audience ? audienceConfig[audience] : null;
 
     if (currentUser) {
+        if (isPasswordChangeRequired()) {
+            return <Navigate to="/change-password" replace />;
+        }
+
         return <Navigate to={getDashboardPath(currentUser.role)} replace />;
     }
 
@@ -56,7 +67,8 @@ export function LoginPage() {
         setIsSubmitting(true);
 
         try {
-            const token = await login(username.trim(), password);
+            const loginResponse = await login(username.trim(), password);
+            const token = loginResponse.token;
 
             if (!token) {
                 setError("Login failed: auth service did not return a token.");
@@ -64,17 +76,24 @@ export function LoginPage() {
             }
 
             localStorage.setItem("token", token);
+            setPasswordChangeRequired(loginResponse.passwordChangeRequired);
 
             const user = getCurrentUser();
 
             if (!user) {
+                clearAuthState();
                 setError("Login failed: received token is invalid or expired.");
                 return;
             }
 
             if (user.role !== activeLoginConfig.role) {
-                localStorage.removeItem("token");
+                clearAuthState();
                 setError(`This portal is only for ${activeLoginConfig.title.replace(" Login", "")} accounts.`);
+                return;
+            }
+
+            if (loginResponse.passwordChangeRequired) {
+                navigate("/change-password", { replace: true });
                 return;
             }
 

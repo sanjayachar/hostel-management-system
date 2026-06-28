@@ -13,6 +13,8 @@ export type JwtPayload = {
     exp: number;
 };
 
+const PASSWORD_CHANGE_REQUIRED_KEY = "passwordChangeRequired";
+
 export function getCurrentUser() {
     const token = localStorage.getItem("token");
 
@@ -31,6 +33,24 @@ export function getCurrentUser() {
         localStorage.removeItem("token");
         return null;
     }
+}
+
+export function setPasswordChangeRequired(required: boolean) {
+    if (required) {
+        localStorage.setItem(PASSWORD_CHANGE_REQUIRED_KEY, "true");
+        return;
+    }
+
+    localStorage.removeItem(PASSWORD_CHANGE_REQUIRED_KEY);
+}
+
+export function isPasswordChangeRequired() {
+    return localStorage.getItem(PASSWORD_CHANGE_REQUIRED_KEY) === "true";
+}
+
+export function clearAuthState() {
+    localStorage.removeItem("token");
+    setPasswordChangeRequired(false);
 }
 
 export function getDashboardPath(role: UserRole) {

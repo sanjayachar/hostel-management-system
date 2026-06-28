@@ -8,6 +8,8 @@ import com.hostel.staff.common.exception.ResourceNotFoundException;
 import com.hostel.staff.common.util.Constants;
 import com.hostel.staff.common.util.SecurityContextUtil;
 import com.hostel.staff.dto.AccommodationRequestDto;
+import com.hostel.staff.dto.CreatedAuthUser;
+import com.hostel.staff.dto.EmailNotificationEvent;
 import com.hostel.staff.dto.StaffDto;
 import com.hostel.staff.dto.StudentsDto;
 import com.hostel.staff.entity.Staff;
@@ -16,12 +18,16 @@ import com.hostel.staff.repository.StaffRepo;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -34,7 +40,9 @@ public class StaffService {
     private final AuthClient authClient;
     private final AccommodationClient accommodationClient;
     private final StudentDetailsClient studentDetailsClient;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
+    @Transactional
     public void saveOrUpdateStaff(@Valid StaffDto staffDto) {
         if (staffDto.getStaffId()==null) {
             registerStaff(staffDto);
@@ -45,10 +53,31 @@ public class StaffService {
     public void registerStaff(@Valid StaffDto staffDto) {
         Long userId = null;
         try {
-            userId = saveUserDetails(staffDto);
+            CreatedAuthUser createdAuthUser = saveUserDetails(staffDto);
             Staff staff = staffMapper.toEntityForSave(staffDto);
+            userId = createdAuthUser.userId();
             staff.setUserId(userId);
             staffRepo.save(staff);
+            EmailNotificationEvent emailEvent = new EmailNotificationEvent(
+                    UUID.randomUUID().toString(),
+                    "USER_CREATED",
+                    "USER_CREATED",
+                    userId,
+                    "ROLE_STAFF",
+                    staffDto.getEmail(),
+                    staffDto.getFirstName() + " " + staffDto.getLastName(),
+                    null,
+                    "staff-service",
+                    "STAFF",
+                    staff.getStaffId(),
+                    Map.of(
+                            "username", staffDto.getEmployeeCode(),
+                            "temporaryPassword", createdAuthUser.temporaryPassword(),
+                            "instruction", "Please login using this temporary password and reset your password immediately."
+                    ),
+                    LocalDateTime.now()
+            );
+            applicationEventPublisher.publishEvent(emailEvent);
         } catch (Exception e) {
             if (userId != null) {
                 try {
@@ -78,15 +107,13 @@ public class StaffService {
         staffRepo.save(staff);
     }
 
-    private Long saveUserDetails(@Valid StaffDto staffDto) {
+    private CreatedAuthUser saveUserDetails(@Valid StaffDto staffDto) {
         String rawPassword = generatePassword();
-        log.info("The new raw password for user {} is {}",staffDto.getEmployeeCode(), rawPassword);
-        Long userId = authClient.createUser(
+        return authClient.createUser(
                 staffDto.getEmployeeCode(),
                 rawPassword,
                 RoleEnum.ROLE_STAFF.name()
         );
-        return userId;
     }
 
     private String generatePassword() {

@@ -1,5 +1,6 @@
 package com.candidate.othercandidateservice.client.grpc;
 
+import com.candidate.othercandidateservice.dto.CreatedAuthUser;
 import com.hostel.proto.auth.AuthServiceGrpc;
 import com.hostel.proto.auth.CreateUserRequest;
 import com.hostel.proto.auth.CreateUserResponse;
@@ -13,14 +14,14 @@ public class AuthClient {
     @GrpcClient("auth-service")
     private AuthServiceGrpc.AuthServiceBlockingStub stub;
 
-    public Long createUser(String userName, String password, String role) {
+    public CreatedAuthUser createUser(String userName, String password, String role) {
         CreateUserRequest request = CreateUserRequest.newBuilder()
                 .setUserName(userName)
                 .setPassword(password)
                 .setRole(role)
                 .build();
         CreateUserResponse response = stub.createUser(request);
-        return response.getUserId();
+        return new CreatedAuthUser(response.getUserId(), password);
     }
 
     public void deleteUser(Long userId) {

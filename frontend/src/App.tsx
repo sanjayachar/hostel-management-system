@@ -1,8 +1,9 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { LoginPage } from "./features/auth/LoginPage";
+import { ChangePasswordPage } from "./features/auth/ChangePasswordPage";
 import { LandingPage } from "./features/landing/LandingPage";
 import { RegisterPage } from "./features/register/RegisterPage";
-import { getCurrentUser, getDashboardPath, type UserRole } from "./lib/auth";
+import { getCurrentUser, getDashboardPath, isPasswordChangeRequired, type UserRole } from "./lib/auth";
 import { RequestListPage } from "./features/requests/RequestListPage";
 import { RequestCreatePage } from "./features/requests/RequestCreatePage";
 import { NavigationBar } from "./components/navigation/NavigationBar";
@@ -21,6 +22,23 @@ import { ChatPage } from "./features/chat/ChatPage";
 import "./assets/css/AppLayout.css";
 import type { ReactNode } from "react";
 
+function AppFrame({ children }: { children: ReactNode }) {
+  return (
+      <div className="app-shell">
+        <NavigationBar />
+        <main className="app-main">{children}</main>
+      </div>
+  );
+}
+
+function AuthenticatedRoute({ children }: { children: ReactNode }) {
+  const user = getCurrentUser();
+
+  if (!user) return <Navigate to="/" replace />;
+
+  return <AppFrame>{children}</AppFrame>;
+}
+
 function ProtectedRoute({
                           allowedRole,
                           children,
@@ -31,14 +49,10 @@ function ProtectedRoute({
   const user = getCurrentUser();
 
   if (!user) return <Navigate to="/" replace />;
+  if (isPasswordChangeRequired()) return <Navigate to="/change-password" replace />;
   if (user.role !== allowedRole) return <Navigate to={getDashboardPath(user.role)} replace />;
 
-  return (
-      <div className="app-shell">
-        <NavigationBar />
-        <main className="app-main">{children}</main>
-      </div>
-  );
+  return <AppFrame>{children}</AppFrame>;
 }
 
 function App() {
@@ -47,6 +61,14 @@ function App() {
         <Route path="/" element={<LandingPage />} />
         <Route path="/login/:audience" element={<LoginPage />} />
         <Route path="/register/:type" element={<RegisterPage />} />
+        <Route
+            path="/change-password"
+            element={
+              <AuthenticatedRoute>
+                <ChangePasswordPage />
+              </AuthenticatedRoute>
+            }
+        />
 
         <Route
             path="/admin"

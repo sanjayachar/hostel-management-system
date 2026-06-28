@@ -8,17 +8,23 @@ import com.candidate.othercandidateservice.common.util.Constants;
 import com.candidate.othercandidateservice.common.util.SecurityContextUtil;
 import com.candidate.othercandidateservice.dto.AccommodationRequestDto;
 import com.candidate.othercandidateservice.dto.CandidateDto;
+import com.candidate.othercandidateservice.dto.CreatedAuthUser;
+import com.candidate.othercandidateservice.dto.EmailNotificationEvent;
 import com.candidate.othercandidateservice.entity.Candidate;
 import com.candidate.othercandidateservice.mapper.CandidateMapper;
 import com.candidate.othercandidateservice.repository.CandidateRepo;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -30,7 +36,9 @@ public class CandidateService {
     private final CandidateMapper candidateMapper;
     private final AuthClient authClient;
     private final AccommodationClient accommodationClient;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
+    @Transactional
     public void saveOrUpdateCandidate(@Valid CandidateDto candidateDto) {
         if (candidateDto.getCandidateId() == null) {
             registerCandidate(candidateDto);
@@ -42,10 +50,29 @@ public class CandidateService {
     public void registerCandidate(@Valid CandidateDto candidateDto) {
         Long userId = null;
         try {
-            userId = saveUserDetails(candidateDto);
+            CreatedAuthUser createdAuthUser = saveUserDetails(candidateDto);
             Candidate candidate = candidateMapper.toEntityForSave(candidateDto);
+            userId = createdAuthUser.userId();
             candidate.setUserId(userId);
             candidateRepo.save(candidate);
+            EmailNotificationEvent emailEvent = new EmailNotificationEvent(
+                    UUID.randomUUID().toString(),
+                    "USER_CREATED",
+                    "USER_CREATED",
+                    userId,
+                    "ROLE_CANDIDATE",
+                    candidateDto.getEmail(),
+                    candidateDto.getFirstName() + " " + candidateDto.getLastName(),
+                    null,
+                    "other-candidate-service",
+                    "CANDIDATE",
+                    candidate.getCandidateId(),
+                    Map.of("username", candidateDto.getCandidateCode(),
+                            "temporaryPassword", createdAuthUser.temporaryPassword(),
+                            "instruction", "Please login using this temporary password and reset your password immediately."),
+                    LocalDateTime.now()
+            );
+            applicationEventPublisher.publishEvent(emailEvent);
         } catch (Exception e) {
             if (userId != null) {
                 try {
@@ -75,9 +102,8 @@ public class CandidateService {
         candidateRepo.save(candidate);
     }
 
-    private Long saveUserDetails(@Valid CandidateDto candidateDto) {
+    private CreatedAuthUser saveUserDetails(@Valid CandidateDto candidateDto) {
         String rawPassword = generatePassword();
-        log.info("The new raw password for user {} is {}", candidateDto.getCandidateCode(), rawPassword);
         return authClient.createUser(
                 candidateDto.getCandidateCode(),
                 rawPassword,

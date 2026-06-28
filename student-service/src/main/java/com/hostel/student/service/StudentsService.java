@@ -9,6 +9,7 @@ import com.hostel.student.common.exception.ResourceNotFoundException;
 import com.hostel.student.common.util.Constants;
 import com.hostel.student.common.util.SecurityContextUtil;
 import com.hostel.student.dto.AccommodationRequestDto;
+import com.hostel.student.dto.CreatedAuthUser;
 import com.hostel.student.dto.EmailNotificationApplicationEvent;
 import com.hostel.student.dto.EmailNotificationEvent;
 import com.hostel.student.dto.StudentsDto;
@@ -55,8 +56,9 @@ public class StudentsService {
     public void registerStudent(StudentsDto studentsDto) {
         Long userId = null;
         try {
-            userId = saveUserDetails(studentsDto);
+            CreatedAuthUser createdAuthUser = saveUserDetails(studentsDto);
             Students students = studentMapper.toEntityForSave(studentsDto);
+            userId = createdAuthUser.userId();
             students.setUserId(userId);
             studentRepo.save(students);
             EmailNotificationEvent emailEvent = new EmailNotificationEvent(
@@ -71,10 +73,14 @@ public class StudentsService {
                     "student-service",
                     "STUDENT",
                     students.getStudentId(),
-                    Map.of("username", studentsDto.getAdmissionNumber()),
+                    Map.of(
+                            "username", studentsDto.getAdmissionNumber(),
+                            "temporaryPassword", createdAuthUser.temporaryPassword(),
+                            "instruction", "Please login using this temporary password and reset your password immediately."
+                    ),
                     LocalDateTime.now()
             );
-            applicationEventPublisher.publishEvent(new EmailNotificationApplicationEvent(emailEvent));
+            applicationEventPublisher.publishEvent(emailEvent);
         } catch (Exception e) {
             if (userId != null) {
                 try {
@@ -103,15 +109,13 @@ public class StudentsService {
         studentRepo.save(students);
     }
 
-    private Long saveUserDetails(StudentsDto studentsDto) {
+    private CreatedAuthUser saveUserDetails(StudentsDto studentsDto) {
         String rawPassword = generatePassword();
-        log.info("The new raw password for user {} is {}",studentsDto.getAdmissionNumber(), rawPassword);
-        Long userId = authClient.createUser(
+        return authClient.createUser(
                 studentsDto.getAdmissionNumber(),
                 rawPassword,
                 RoleEnum.ROLE_STUDENT.name()
         );
-        return userId;
     }
 
     private String generatePassword() {

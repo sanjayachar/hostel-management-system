@@ -39,6 +39,13 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: hostel-mailpit
+    ports:
+      - "1025:1025"
+      - "8025:8025"
 #  app:
 #    build: .
 #    container_name: hostel-app

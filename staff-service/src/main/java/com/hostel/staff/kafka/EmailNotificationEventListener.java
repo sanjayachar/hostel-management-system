@@ -1,6 +1,6 @@
-package com.hostel.student.kafka;
+package com.hostel.staff.kafka;
 
-import com.hostel.student.dto.EmailNotificationEvent;
+import com.hostel.staff.dto.EmailNotificationEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;

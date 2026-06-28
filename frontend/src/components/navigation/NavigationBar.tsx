@@ -2,7 +2,13 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { HostelLogo } from "../brand/HostelLogo";
 import { logout } from "../../features/auth/authApi";
-import { getCurrentUser, getDashboardPath, type UserRole } from "../../lib/auth";
+import {
+    clearAuthState,
+    getCurrentUser,
+    getDashboardPath,
+    isPasswordChangeRequired,
+    type UserRole
+} from "../../lib/auth";
 
 function formatRole(role?: string) {
     return role ? role.replace("ROLE_", "").toLowerCase() : "user";
@@ -20,6 +26,7 @@ function getRequestPath(role: UserRole) {
 export function NavigationBar() {
     const navigate = useNavigate();
     const user = getCurrentUser();
+    const passwordChangeRequired = isPasswordChangeRequired();
     const [isLoggingOut, setIsLoggingOut] = useState(false);
 
     async function handleLogout() {
@@ -30,9 +37,9 @@ export function NavigationBar() {
         } catch {
             // Local logout should still happen if the token is expired or the auth service is unavailable.
         } finally {
-            localStorage.removeItem("token");
+            clearAuthState();
             setIsLoggingOut(false);
-            navigate("/login", { replace: true });
+            navigate("/", { replace: true });
         }
     }
 
@@ -48,11 +55,18 @@ export function NavigationBar() {
             <nav className="app-nav-links" aria-label="Primary navigation">
                 {user && (
                     <>
-                        <Link className="app-nav-link" to={getDashboardPath(user.role)}>
-                            Dashboard
-                        </Link>
-                        <Link className="app-nav-link" to={getRequestPath(user.role)}>
-                            Requests
+                        {!passwordChangeRequired && (
+                            <>
+                                <Link className="app-nav-link" to={getDashboardPath(user.role)}>
+                                    Dashboard
+                                </Link>
+                                <Link className="app-nav-link" to={getRequestPath(user.role)}>
+                                    Requests
+                                </Link>
+                            </>
+                        )}
+                        <Link className="app-nav-link" to="/change-password">
+                            Change Password
                         </Link>
                     </>
                 )}

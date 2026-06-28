@@ -52,4 +52,10 @@ public class User extends CommonEntity {
 
     @Column(name = "last_login_time")
     private LocalDateTime lastLoginTime;
+
+    @Column(name = "password_change_required")
+    private Boolean passwordChangeRequired = false;
+
+    @Column(name = "password_changed_at")
+    private LocalDateTime passwordChangedAt;
 }

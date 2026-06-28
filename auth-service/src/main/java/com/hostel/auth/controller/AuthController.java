@@ -1,6 +1,7 @@
 package com.hostel.auth.controller;
 
 
+import com.hostel.auth.dto.ChangePasswordRequest;
 import com.hostel.auth.record.CreateUserRequest;
 import com.hostel.auth.record.CreateUserResponse;
 import com.hostel.auth.record.JwtAuthResponse;
@@ -39,7 +40,7 @@ public class AuthController {
         User user = ((CustomUserDetails) authentication.getPrincipal()).user();
         stringRedisTemplate.opsForValue().set( "tokenVersion:" + user.getUserId(), String.valueOf(user.getTokenVersion()));
         String token = jwtService.generateToken(Objects.requireNonNull(user));
-        return ResponseEntity.ok(new JwtAuthResponse(token));
+        return ResponseEntity.ok(new JwtAuthResponse(token, Boolean.TRUE.equals(user.getPasswordChangeRequired())));
     }
 
     @PostMapping("/logout")
@@ -51,5 +52,11 @@ public class AuthController {
     @PostMapping("/internal/create-user")
     public ResponseEntity<CreateUserResponse> createUser(@RequestBody CreateUserRequest request) {
         return ResponseEntity.ok(authService.createUser(request));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<?> changePassword(@RequestBody ChangePasswordRequest request) {
+        authService.changePassword(request);
+        return ResponseEntity.ok("Password changed successfully.");
     }
 }

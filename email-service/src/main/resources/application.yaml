@@ -30,16 +30,16 @@ spring:
         spring.json.value.default.type: com.email.emailservice.dto.EmailNotificationEvent
 
   mail:
-    host: localhost
-    port: 1025
-    username:
-    password:
+    host: smtp.gmail.com
+    port: 587
+    username: sanjayachar2k01@gmail.com
+    password: xnmf jkmb tbzo rrzr
     properties:
       mail:
         smtp:
-          auth: false
+          auth: true
           starttls:
-            enable: false
+            enable: true
 
 #    host: smtp.gmail.com
 #      port: 587

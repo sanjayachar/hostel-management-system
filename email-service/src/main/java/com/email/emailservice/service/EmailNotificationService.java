@@ -4,6 +4,7 @@ import com.email.emailservice.dto.EmailNotificationEvent;
 import com.email.emailservice.entity.EmailNotification;
 import com.email.emailservice.repository.EmailNotificationRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,8 @@ public class EmailNotificationService {
     private final EmailNotificationRepository emailNotificationRepository;
     private final JavaMailSender javaMailSender;
 
+    @Value("${spring.mail.username}")
+    private String senderEmail;
 
     @Transactional
     public void process(EmailNotificationEvent event) {
@@ -89,7 +92,7 @@ public class EmailNotificationService {
         message.setTo(notification.getRecipientEmail());
         message.setSubject(notification.getSubject());
         message.setText(notification.getBody());
-        message.setFrom("noreply@hostel-management.com");
+        message.setFrom(senderEmail);
         javaMailSender.send(message);
     }
 
