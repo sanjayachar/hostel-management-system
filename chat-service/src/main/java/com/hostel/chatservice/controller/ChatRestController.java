@@ -70,6 +70,14 @@ public class ChatRestController {
         return ResponseEntity.ok(chatService.getRoomMembers(roomId, ChatUser.fromPrincipal(principal)));
     }
 
+    @GetMapping("/rooms/{roomId}/mention-users")
+    public ResponseEntity<List<ChatRoomMemberDto>> getMentionableUsers(
+            @PathVariable Long roomId,
+            Principal principal
+    ) {
+        return ResponseEntity.ok(chatService.getMentionableUsers(roomId, ChatUser.fromPrincipal(principal)));
+    }
+
     @PostMapping("/rooms/{roomId}/messages")
     public ResponseEntity<ChatMessageDto> sendMessage(
             @PathVariable Long roomId,

@@ -28,6 +28,7 @@ import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -124,11 +125,36 @@ public class StaffService {
         return staffRepo.findAll().stream().map(staffMapper::toDto).collect(Collectors.toList());
     }
 
+    public List<Staff> getActiveStaffs() {
+        return staffRepo.findAllByActiveFlag(Constants.ACTIVE);
+    }
+
     public String getNextEmployeeCode() {
         String prefix = "EMP" + Year.now().getValue();
-        Integer maxSuffix = staffRepo.findMaxEmployeeCodeSuffix(prefix);
-        int nextSuffix = (maxSuffix == null ? 0 : maxSuffix) + 1;
+        int maxSuffix = staffRepo.findAllByEmployeeCodeStartingWith(prefix).stream()
+                .map(Staff::getEmployeeCode)
+                .mapToInt(employeeCode -> extractSuffix(employeeCode, prefix))
+                .max()
+                .orElse(0);
+        int nextSuffix = maxSuffix + 1;
         return prefix + String.format("%03d", nextSuffix);
+    }
+
+    private int extractSuffix(String value, String prefix) {
+        if (value == null || !value.startsWith(prefix)) {
+            return 0;
+        }
+
+        String suffix = value.substring(prefix.length());
+        if (suffix.isBlank()) {
+            return 0;
+        }
+
+        try {
+            return Integer.parseInt(suffix);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
     }
 
     public StaffDto getStaffById(Long staffId) {
@@ -138,6 +164,14 @@ public class StaffService {
 
     StaffDto getStaffByEmployeeCode(String username) {
         return staffRepo.findByEmployeeCodeAndActiveFlag(username, Constants.ACTIVE).map(staffMapper::toDto).orElseThrow(()->new ResourceNotFoundException("Staff Not Found"));
+    }
+
+    public Optional<Staff> getActiveStaffByUserId(Long userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+
+        return staffRepo.findFirstByUserIdAndActiveFlagOrderByStaffIdDesc(userId, Constants.ACTIVE);
     }
 
     public List<AccommodationRequestDto> getStaffsAccommodationRequest(RoleEnum roleEnum) {

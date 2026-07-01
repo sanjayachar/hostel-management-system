@@ -61,6 +61,11 @@ export async function getChatRoomMembers(roomId: number) {
     return response.data;
 }
 
+export async function getChatMentionUsers(roomId: number) {
+    const response = await api.get<ChatRoomMember[]>(`/chat-service-api/chat/rooms/${roomId}/mention-users`);
+    return response.data;
+}
+
 export async function sendChatMessage(roomId: number, message: string, mentionedUserIds: number[] = []) {
     const response = await api.post<ChatMessage>(`/chat-service-api/chat/rooms/${roomId}/messages`, { message, mentionedUserIds });
     return response.data;

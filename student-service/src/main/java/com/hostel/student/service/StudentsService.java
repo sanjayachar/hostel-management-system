@@ -30,6 +30,7 @@ import java.time.Year;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -126,6 +127,10 @@ public class StudentsService {
         return studentRepo.findAllByActiveFlag(Constants.ACTIVE).orElse(Collections.emptyList()).stream().map(studentMapper::toDto).collect(Collectors.toList());
     }
 
+    public List<Students> getActiveStudents() {
+        return studentRepo.findAllByActiveFlag(Constants.ACTIVE).orElse(Collections.emptyList());
+    }
+
     public StudentsDto getStudentById(Long studentId) {
         StudentsDto studentsDto = studentRepo.findByStudentIdAndActiveFlag(studentId, Constants.ACTIVE).map(studentMapper::toDto).orElseThrow(()->new ResourceNotFoundException("Student Not Found."));
         return studentsDto;
@@ -136,15 +141,44 @@ public class StudentsService {
         return studentsDto;
     }
 
+    public Optional<Students> getActiveStudentByUserId(Long userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+
+        return studentRepo.findFirstByUserIdAndActiveFlagOrderByStudentIdDesc(userId, Constants.ACTIVE);
+    }
+
     public List<AccommodationRequestDto> getStudentsAccommodationRequest(RoleEnum roleEnum) {
         return accommodationClient.getRequests(roleEnum.name(), SecurityContextUtil.getUserId());
     }
 
     public String getNextAdmissionNumber() {
         String prefix = "STU" + Year.now().getValue();
-        Integer maxSuffix = studentRepo.findMaxAdmissionNumberSuffix(prefix);
-        int nextSuffix = (maxSuffix == null ? 0 : maxSuffix) + 1;
+        int maxSuffix = studentRepo.findAllByAdmissionNumberStartingWith(prefix).stream()
+                .map(Students::getAdmissionNumber)
+                .mapToInt(admissionNumber -> extractSuffix(admissionNumber, prefix))
+                .max()
+                .orElse(0);
+        int nextSuffix = maxSuffix + 1;
         return prefix + String.format("%03d", nextSuffix);
+    }
+
+    private int extractSuffix(String value, String prefix) {
+        if (value == null || !value.startsWith(prefix)) {
+            return 0;
+        }
+
+        String suffix = value.substring(prefix.length());
+        if (suffix.isBlank()) {
+            return 0;
+        }
+
+        try {
+            return Integer.parseInt(suffix);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
     }
 
     public ResponseEntity<?> saveOrUpdateAccommodation(@Valid AccommodationRequestDto accommodationRequestDto) {

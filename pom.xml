@@ -124,6 +124,7 @@
 		<module>auth-service</module>
 		<module>accommodation-service</module>
 		<module>staff-service</module>
+		<module>other-candidate-service</module>
 		<module>audit-log-service</module>
 		<module>chat-service</module>
 		<module>email-service</module>

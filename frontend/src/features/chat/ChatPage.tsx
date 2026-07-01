@@ -3,7 +3,7 @@ import axios from "axios";
 import { getCurrentUser } from "../../lib/auth";
 import {
     getChatMessages,
-    getChatRoomMembers,
+    getChatMentionUsers,
     getChatRooms,
     sendChatMessage,
     type ChatMention,
@@ -170,8 +170,7 @@ export function ChatPage() {
         return roomMembers
             .filter((member) => member.userId !== currentUser?.userId)
             .filter((member) => !selectedMentions.some((selectedMention) => selectedMention.userId === member.userId))
-            .filter((member) => getMemberLabel(member).toLowerCase().includes(mentionToken.query))
-            .slice(0, 6);
+            .filter((member) => getMemberLabel(member).toLowerCase().includes(mentionToken.query));
     }, [currentUser?.userId, mentionToken, roomMembers, selectedMentions]);
 
     useEffect(() => {
@@ -252,7 +251,7 @@ export function ChatPage() {
 
         async function loadMembers() {
             try {
-                const data = await getChatRoomMembers(roomId);
+                const data = await getChatMentionUsers(roomId);
 
                 if (isMounted) {
                     setRoomMembers(Array.isArray(data) ? data : []);

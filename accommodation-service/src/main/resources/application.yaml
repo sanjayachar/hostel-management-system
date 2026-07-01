@@ -11,6 +11,7 @@ hostel:
     topic: hostel.audit.logs
   email:
     topic: hostel.email.notifications
+    admin-recipients: sanjayachar2k01@gmail.com
 spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/hostel_management_system
@@ -39,3 +40,13 @@ grpc:
     port : 9092
     security:
       enabled: false
+  client:
+    student-service:
+      address: static://localhost:9094
+      negotiationType: plaintext
+    staff-service:
+      address: static://localhost:9091
+      negotiationType: plaintext
+    other-candidate-service:
+      address: static://localhost:9095
+      negotiationType: plaintext

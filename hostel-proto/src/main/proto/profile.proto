@@ -1,0 +1,33 @@
+syntax = "proto3";
+
+package profile;
+
+option java_package = "com.hostel.proto.profile";
+option java_multiple_files = true;
+
+service ProfileService {
+  rpc GetProfile (UserProfileRequest) returns (UserProfileResponse);
+  rpc ListProfiles (UserProfileListRequest) returns (UserProfileListResponse);
+}
+
+message UserProfileRequest {
+  int64 userId = 1;
+  string role = 2;
+}
+
+message UserProfileListRequest {
+  string role = 1;
+}
+
+message UserProfileResponse {
+  bool found = 1;
+  int64 userId = 2;
+  string role = 3;
+  string code = 4;
+  string displayName = 5;
+  string email = 6;
+}
+
+message UserProfileListResponse {
+  repeated UserProfileResponse profiles = 1;
+}

@@ -5,6 +5,7 @@ import com.hostel.accommodation.common.enums.RoleEnum;
 import com.hostel.accommodation.common.exception.ResourceNotFoundException;
 import com.hostel.accommodation.common.util.Constants;
 import com.hostel.accommodation.dto.AccommodationRequestDto;
+import com.hostel.accommodation.dto.EmailNotificationEvent;
 import com.hostel.accommodation.dto.HostelDto;
 import com.hostel.accommodation.dto.HostelRoomDto;
 import com.hostel.accommodation.dto.RequestDecisionDto;
@@ -20,13 +21,19 @@ import com.hostel.accommodation.repository.HostelRoomRepository;
 import com.hostel.accommodation.repository.RoomAllocationRepository;
 import com.hostel.accommodation.util.SecurityContextUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +45,10 @@ public class AccommodationService {
     private final HostelRoomRepository hostelRoomRepository;
     private final RoomAllocationRepository roomAllocationRepository;
     private final RequesterProfileService requesterProfileService;
+    private final ApplicationEventPublisher applicationEventPublisher;
+
+    @Value("${hostel.email.admin-recipients:}")
+    private String adminRecipients;
 
     private static final String STATUS_PENDING = "Pending";
     private static final String STATUS_APPROVED = "Approved";
@@ -77,7 +88,8 @@ public class AccommodationService {
         request.setStatus(STATUS_PENDING);
         request.setUserId(dto.getUserId());
         request.setUserRole(RoleEnum.valueOf(dto.getUserRole().name()));
-        accommodationRequestsRepository.save(request);
+        AccommodationRequests savedRequest = accommodationRequestsRepository.save(request);
+        publishRequestCreatedEmails(savedRequest);
     }
 
     @Transactional(readOnly = true)
@@ -119,14 +131,17 @@ public class AccommodationService {
         }
 
         String status = normalizeDecisionStatus(decisionDto.getStatus());
+        RoomAllocation allocation = null;
 
         if (STATUS_APPROVED.equals(status)) {
-            approveRequest(accommodationRequests, decisionDto);
+            allocation = approveRequest(accommodationRequests, decisionDto);
         } else if (STATUS_REJECTED.equals(status)) {
             rejectRequest(accommodationRequests, decisionDto);
         } else {
             throw new RuntimeException("Only Approved or Rejected decision is allowed.");
         }
+
+        publishRequestDecisionEmail(accommodationRequests, status, allocation);
 
         return toRequestDto(accommodationRequests);
     }
@@ -181,7 +196,7 @@ public class AccommodationService {
         return rooms.stream().map(this::toRoomDto).toList();
     }
 
-    private void approveRequest(AccommodationRequests request, RequestDecisionDto decisionDto) {
+    private RoomAllocation approveRequest(AccommodationRequests request, RequestDecisionDto decisionDto) {
         if (STATUS_APPROVED.equalsIgnoreCase(request.getStatus())) {
             throw new RuntimeException("Request is already approved.");
         }
@@ -219,6 +234,7 @@ public class AccommodationService {
         hostelRoomRepository.save(room);
         accommodationRequestsRepository.save(request);
         roomAllocationRepository.save(allocation);
+        return allocation;
     }
 
     private void rejectRequest(AccommodationRequests accommodationRequests, RequestDecisionDto decisionDto) {
@@ -308,5 +324,133 @@ public class AccommodationService {
         }
 
         return value.trim();
+    }
+
+    private void publishRequestCreatedEmails(AccommodationRequests request) {
+        RequesterProfileDto profile = requesterProfileService.resolve(request.getUserId(), request.getUserRole());
+        Map<String, String> variables = requestCreatedVariables(request, profile);
+
+        if (!isBlank(profile.requesterEmail())) {
+            applicationEventPublisher.publishEvent(new EmailNotificationEvent(
+                    UUID.randomUUID().toString(),
+                    "ACCOMMODATION_REQUEST_CREATED",
+                    "ACCOMMODATION_REQUEST_CREATED",
+                    request.getUserId(),
+                    request.getUserRole().name(),
+                    profile.requesterEmail(),
+                    defaultValue(profile.requesterName(), "Requester"),
+                    null,
+                    "accommodation-service",
+                    "ACCOMMODATION_REQUEST",
+                    request.getRequestId(),
+                    variables,
+                    LocalDateTime.now()
+            ));
+        }
+
+        adminRecipientEmails().forEach(adminEmail ->
+                applicationEventPublisher.publishEvent(new EmailNotificationEvent(
+                        UUID.randomUUID().toString(),
+                        "ACCOMMODATION_REQUEST_REVIEW_REQUIRED",
+                        "ACCOMMODATION_REQUEST_REVIEW_REQUIRED",
+                        null,
+                        RoleEnum.ROLE_ADMIN.name(),
+                        adminEmail,
+                        "Admin",
+                        "ADMIN",
+                        "accommodation-service",
+                        "ACCOMMODATION_REQUEST",
+                        request.getRequestId(),
+                        variables,
+                        LocalDateTime.now()
+                ))
+        );
+    }
+
+    private Map<String, String> requestCreatedVariables(AccommodationRequests request, RequesterProfileDto profile) {
+        return Map.of(
+                "requestId", String.valueOf(request.getRequestId()),
+                "requestType", defaultValue(request.getRequestType(), "-"),
+                "status", defaultValue(request.getStatus(), "-"),
+                "requesterCode", defaultValue(profile.requesterCode(), "-"),
+                "requesterName", defaultValue(profile.requesterName(), "-"),
+                "fromDate", request.getFromDate() == null ? "-" : request.getFromDate().toString(),
+                "toDate", request.getToDate() == null ? "-" : request.getToDate().toString(),
+                "noOfPersons", request.getNoOfPersons() == null ? "-" : request.getNoOfPersons().toString()
+        );
+    }
+
+    private void publishRequestDecisionEmail(AccommodationRequests request, String status, RoomAllocation allocation) {
+        RequesterProfileDto profile = requesterProfileService.resolve(request.getUserId(), request.getUserRole());
+
+        if (isBlank(profile.requesterEmail())) {
+            return;
+        }
+
+        String templateCode = STATUS_APPROVED.equals(status)
+                ? "ACCOMMODATION_REQUEST_APPROVED"
+                : "ACCOMMODATION_REQUEST_REJECTED";
+
+        applicationEventPublisher.publishEvent(new EmailNotificationEvent(
+                UUID.randomUUID().toString(),
+                templateCode,
+                templateCode,
+                request.getUserId(),
+                request.getUserRole().name(),
+                profile.requesterEmail(),
+                defaultValue(profile.requesterName(), "Requester"),
+                null,
+                "accommodation-service",
+                "ACCOMMODATION_REQUEST",
+                request.getRequestId(),
+                requestDecisionVariables(request, profile, allocation),
+                LocalDateTime.now()
+        ));
+    }
+
+    private Map<String, String> requestDecisionVariables(
+            AccommodationRequests request,
+            RequesterProfileDto profile,
+            RoomAllocation allocation
+    ) {
+        Map<String, String> variables = new LinkedHashMap<>();
+        variables.put("requestId", String.valueOf(request.getRequestId()));
+        variables.put("requestType", defaultValue(request.getRequestType(), "-"));
+        variables.put("status", defaultValue(request.getStatus(), "-"));
+        variables.put("requesterCode", defaultValue(profile.requesterCode(), "-"));
+        variables.put("requesterName", defaultValue(profile.requesterName(), "-"));
+        variables.put("fromDate", request.getFromDate() == null ? "-" : request.getFromDate().toString());
+        variables.put("toDate", request.getToDate() == null ? "-" : request.getToDate().toString());
+        variables.put("noOfPersons", request.getNoOfPersons() == null ? "-" : request.getNoOfPersons().toString());
+        variables.put("decisionNote", defaultValue(request.getDecisionNote(), "-"));
+
+        if (allocation != null) {
+            variables.put("hostelName", allocation.getHostel() == null ? "-" : defaultValue(allocation.getHostel().getHostelName(), "-"));
+            variables.put("roomNumber", allocation.getRoom() == null ? "-" : defaultValue(allocation.getRoom().getRoomNumber(), "-"));
+            variables.put("bedNumber", defaultValue(allocation.getBedNumber(), "-"));
+            variables.put("allocationNote", defaultValue(allocation.getAllocationNote(), "-"));
+        }
+
+        return variables;
+    }
+
+    private List<String> adminRecipientEmails() {
+        if (isBlank(adminRecipients)) {
+            return List.of();
+        }
+
+        return Arrays.stream(adminRecipients.split(","))
+                .map(String::trim)
+                .filter(email -> !email.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private String defaultValue(String value, String fallback) {
+        return isBlank(value) ? fallback : value.trim();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }

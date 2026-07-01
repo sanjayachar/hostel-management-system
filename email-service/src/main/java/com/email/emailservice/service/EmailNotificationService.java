@@ -100,6 +100,7 @@ public class EmailNotificationService {
         return switch (defaultValue(event.templateCode(), "GENERAL")) {
             case "USER_CREATED" -> "Your hostel account has been created";
             case "ACCOMMODATION_REQUEST_CREATED" -> "Accommodation request created";
+            case "ACCOMMODATION_REQUEST_REVIEW_REQUIRED" -> "Accommodation request requires review";
             case "ACCOMMODATION_REQUEST_APPROVED" -> "Accommodation request approved";
             case "ACCOMMODATION_REQUEST_REJECTED" -> "Accommodation request rejected";
             case "CHAT_MENTIONED" -> "You were mentioned in hostel chat";
@@ -108,6 +109,27 @@ public class EmailNotificationService {
     }
 
     private String buildBody(EmailNotificationEvent event) {
+        String templateCode = defaultValue(event.templateCode(), "GENERAL");
+        if ("ACCOMMODATION_REQUEST_REVIEW_REQUIRED".equals(templateCode)) {
+            return buildAdminAccommodationRequestBody(event);
+        }
+
+        if ("ACCOMMODATION_REQUEST_CREATED".equals(templateCode)) {
+            return buildRequesterAccommodationRequestBody(event);
+        }
+
+        if ("ACCOMMODATION_REQUEST_APPROVED".equals(templateCode)) {
+            return buildApprovedAccommodationRequestBody(event);
+        }
+
+        if ("ACCOMMODATION_REQUEST_REJECTED".equals(templateCode)) {
+            return buildRejectedAccommodationRequestBody(event);
+        }
+
+        if ("CHAT_MENTIONED".equals(templateCode)) {
+            return buildChatMentionedBody(event);
+        }
+
         String recipientName = defaultValue(event.recipientName(), "User");
         StringBuilder body = new StringBuilder();
 
@@ -126,6 +148,108 @@ public class EmailNotificationService {
 
         body.append("Regards,\nHostel Management System");
         return body.toString();
+    }
+
+    private String buildChatMentionedBody(EmailNotificationEvent event) {
+        Map<String, String> variables = event.variables();
+        StringBuilder body = new StringBuilder();
+
+        body.append("Hi ").append(defaultValue(event.recipientName(), "User")).append(",\n\n");
+        body.append("You were mentioned in hostel chat.\n\n");
+        appendVariable(body, variables, "roomName", "Room");
+        appendVariable(body, variables, "senderName", "Mentioned By");
+        appendVariable(body, variables, "senderRole", "Sender Role");
+        appendVariable(body, variables, "messagePreview", "Message");
+        body.append("\nPlease open the hostel application to reply.\n\n");
+        body.append("Regards,\nHostel Management System");
+
+        return body.toString();
+    }
+
+    private String buildApprovedAccommodationRequestBody(EmailNotificationEvent event) {
+        Map<String, String> variables = event.variables();
+        StringBuilder body = new StringBuilder();
+
+        body.append("Hi ").append(defaultValue(event.recipientName(), "Requester")).append(",\n\n");
+        body.append("Your accommodation request has been approved and the accommodation has been allotted.\n\n");
+        appendVariable(body, variables, "requestId", "Request ID");
+        appendVariable(body, variables, "requestType", "Request Type");
+        appendVariable(body, variables, "hostelName", "Hostel");
+        appendVariable(body, variables, "roomNumber", "Room");
+        appendVariable(body, variables, "bedNumber", "Bed");
+        appendVariable(body, variables, "fromDate", "Allocated From");
+        appendVariable(body, variables, "toDate", "Allocated To");
+        appendVariable(body, variables, "allocationNote", "Allocation Note");
+        appendVariable(body, variables, "decisionNote", "Decision Note");
+        body.append("\nRegards,\nHostel Management System");
+
+        return body.toString();
+    }
+
+    private String buildRejectedAccommodationRequestBody(EmailNotificationEvent event) {
+        Map<String, String> variables = event.variables();
+        StringBuilder body = new StringBuilder();
+
+        body.append("Hi ").append(defaultValue(event.recipientName(), "Requester")).append(",\n\n");
+        body.append("Your accommodation request has been rejected.\n\n");
+        appendVariable(body, variables, "requestId", "Request ID");
+        appendVariable(body, variables, "requestType", "Request Type");
+        appendVariable(body, variables, "fromDate", "From Date");
+        appendVariable(body, variables, "toDate", "To Date");
+        appendVariable(body, variables, "noOfPersons", "No. of Persons");
+        appendVariable(body, variables, "decisionNote", "Decision Note");
+        body.append("\nRegards,\nHostel Management System");
+
+        return body.toString();
+    }
+
+    private String buildAdminAccommodationRequestBody(EmailNotificationEvent event) {
+        Map<String, String> variables = event.variables();
+        StringBuilder body = new StringBuilder();
+
+        body.append("Hi ").append(defaultValue(event.recipientName(), "Admin")).append(",\n\n");
+        body.append("A new accommodation request has been created. These are the accommodation request details. Please review it.\n\n");
+        appendVariable(body, variables, "requestId", "Request ID");
+        appendVariable(body, variables, "requestType", "Request Type");
+        appendVariable(body, variables, "requesterCode", "Requester Code");
+        appendVariable(body, variables, "requesterName", "Requester Name");
+        appendVariable(body, variables, "fromDate", "From Date");
+        appendVariable(body, variables, "toDate", "To Date");
+        appendVariable(body, variables, "noOfPersons", "No. of Persons");
+        appendVariable(body, variables, "status", "Status");
+        body.append("\nRegards,\nHostel Management System");
+
+        return body.toString();
+    }
+
+    private String buildRequesterAccommodationRequestBody(EmailNotificationEvent event) {
+        Map<String, String> variables = event.variables();
+        StringBuilder body = new StringBuilder();
+
+        body.append("Hi ").append(defaultValue(event.recipientName(), "Requester")).append(",\n\n");
+        body.append("Your accommodation request has been created successfully. The admin team will review it.\n\n");
+        appendVariable(body, variables, "requestId", "Request ID");
+        appendVariable(body, variables, "requestType", "Request Type");
+        appendVariable(body, variables, "fromDate", "From Date");
+        appendVariable(body, variables, "toDate", "To Date");
+        appendVariable(body, variables, "noOfPersons", "No. of Persons");
+        appendVariable(body, variables, "status", "Status");
+        body.append("\nRegards,\nHostel Management System");
+
+        return body.toString();
+    }
+
+    private void appendVariable(StringBuilder body, Map<String, String> variables, String key, String label) {
+        if (variables == null || variables.isEmpty()) {
+            return;
+        }
+
+        String value = variables.get(key);
+        if (value == null || value.isBlank()) {
+            return;
+        }
+
+        body.append(label).append(": ").append(value).append("\n");
     }
 
     private String formatLabel(String key) {

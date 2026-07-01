@@ -25,6 +25,7 @@ import java.time.LocalDateTime;
 import java.time.Year;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -119,6 +120,10 @@ public class CandidateService {
         return candidateRepo.findAll().stream().map(candidateMapper::toDto).collect(Collectors.toList());
     }
 
+    public List<Candidate> getActiveCandidates() {
+        return candidateRepo.findAllByActiveFlag(Constants.ACTIVE);
+    }
+
     public CandidateDto getCandidateById(Long candidateId) {
         return candidateRepo.findByCandidateIdAndActiveFlag(candidateId, Constants.ACTIVE)
                 .map(candidateMapper::toDto)
@@ -131,15 +136,44 @@ public class CandidateService {
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate Not Found"));
     }
 
+    public Optional<Candidate> getActiveCandidateByUserId(Long userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+
+        return candidateRepo.findFirstByUserIdAndActiveFlagOrderByCandidateIdDesc(userId, Constants.ACTIVE);
+    }
+
     public List<AccommodationRequestDto> getCandidateAccommodationRequest(RoleEnum roleEnum) {
         return accommodationClient.getRequests(roleEnum.name(), SecurityContextUtil.getUserId());
     }
 
     public String getNextCandidateCode() {
         String prefix = "CAND" + Year.now().getValue();
-        Integer maxSuffix = candidateRepo.findMaxCandidateCodeSuffix(prefix);
-        int nextSuffix = (maxSuffix == null ? 0 : maxSuffix) + 1;
+        int maxSuffix = candidateRepo.findAllByCandidateCodeStartingWith(prefix).stream()
+                .map(Candidate::getCandidateCode)
+                .mapToInt(candidateCode -> extractSuffix(candidateCode, prefix))
+                .max()
+                .orElse(0);
+        int nextSuffix = maxSuffix + 1;
         return prefix + String.format("%03d", nextSuffix);
+    }
+
+    private int extractSuffix(String value, String prefix) {
+        if (value == null || !value.startsWith(prefix)) {
+            return 0;
+        }
+
+        String suffix = value.substring(prefix.length());
+        if (suffix.isBlank()) {
+            return 0;
+        }
+
+        try {
+            return Integer.parseInt(suffix);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
     }
 
     public ResponseEntity<?> saveOrUpdateAccommodation(@Valid AccommodationRequestDto accommodationRequestDto) {

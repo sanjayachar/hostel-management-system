@@ -7,7 +7,9 @@ import com.hostel.chatservice.dto.ChatRoomDto;
 import com.hostel.chatservice.dto.ChatTypingDto;
 import com.hostel.chatservice.dto.ChatTypingRequest;
 import com.hostel.chatservice.dto.ChatUser;
+import com.hostel.chatservice.dto.ChatUserProfileDto;
 import com.hostel.chatservice.dto.CreateChatRoomRequest;
+import com.hostel.chatservice.dto.EmailNotificationEvent;
 import com.hostel.chatservice.dto.SendChatMessageRequest;
 import com.hostel.chatservice.entity.ChatMessage;
 import com.hostel.chatservice.entity.ChatMessageMention;
@@ -18,6 +20,8 @@ import com.hostel.chatservice.repository.ChatMessageRepository;
 import com.hostel.chatservice.repository.ChatRoomMemberRepository;
 import com.hostel.chatservice.repository.ChatRoomRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
@@ -25,6 +29,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
@@ -32,8 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
-import java.util.stream.Collectors;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +53,11 @@ public class ChatService {
     private final ChatMessageRepository chatMessageRepository;
     private final ChatMessageMentionRepository chatMessageMentionRepository;
     private final ChatUserDisplayNameService chatUserDisplayNameService;
+    private final ChatUserProfileService chatUserProfileService;
+    private final ApplicationEventPublisher applicationEventPublisher;
+
+    @Value("${hostel.email.admin-recipients:}")
+    private String adminRecipients;
 
     @Transactional
     public List<ChatRoomDto> getRooms(ChatUser user) {
@@ -117,6 +128,23 @@ public class ChatService {
     }
 
     @Transactional
+    public List<ChatRoomMemberDto> getMentionableUsers(Long roomId, ChatUser user) {
+        ChatRoom room = requireAccessibleRoom(roomId, user);
+        Map<Long, ChatRoomMemberDto> users = new LinkedHashMap<>();
+
+        chatUserProfileService.findAllProfiles().stream()
+                .filter(profile -> profile.userId() != null)
+                .forEach(profile -> users.put(profile.userId(), toMemberDto(profile)));
+
+        chatRoomMemberRepository.findByRoomRoomIdOrderByJoinedAtAsc(room.getRoomId())
+                .forEach(member -> users.putIfAbsent(member.getUserId(), toMemberDto(member)));
+
+        return users.values().stream()
+                .sorted(Comparator.comparing(member -> defaultValue(member.username(), "").toLowerCase()))
+                .toList();
+    }
+
+    @Transactional
     public ChatMessageDto sendMessage(Long roomId, SendChatMessageRequest request, ChatUser user) {
         ChatRoom room = requireAccessibleRoom(roomId, user);
 
@@ -135,9 +163,7 @@ public class ChatService {
 
         ChatMessage savedMessage = chatMessageRepository.save(message);
         List<ChatMessageMention> mentions = saveMentions(savedMessage, room, mentionedUserIds);
-
-        // TODO: Publish CHAT_MENTIONED email notification events to Kafka here after email-service is added.
-        // Prefer raising an application event and publishing from @TransactionalEventListener(AFTER_COMMIT).
+        publishMentionEmails(savedMessage, room, mentions);
 
         return toMessageDto(savedMessage, mentions);
     }
@@ -193,8 +219,13 @@ public class ChatService {
     }
 
     private void mergeRoomIntoPrimary(ChatRoom primaryRoom, ChatRoom duplicateRoom) {
-        chatMessageRepository.moveMessagesToRoom(duplicateRoom.getRoomId(), primaryRoom.getRoomId());
-        chatMessageMentionRepository.moveMentionsToRoom(duplicateRoom.getRoomId(), primaryRoom.getRoomId());
+        List<ChatMessage> messages = chatMessageRepository.findAllByRoomRoomId(duplicateRoom.getRoomId());
+        messages.forEach(message -> message.setRoom(primaryRoom));
+        chatMessageRepository.saveAll(messages);
+
+        List<ChatMessageMention> mentions = chatMessageMentionRepository.findAllByRoomRoomId(duplicateRoom.getRoomId());
+        mentions.forEach(mention -> mention.setRoom(primaryRoom));
+        chatMessageMentionRepository.saveAll(mentions);
 
         chatRoomMemberRepository.findByRoomRoomIdOrderByJoinedAtAsc(duplicateRoom.getRoomId())
                 .forEach(member -> {
@@ -256,30 +287,125 @@ public class ChatService {
             return Collections.emptyList();
         }
 
-        Map<Long, ChatRoomMember> membersByUserId = chatRoomMemberRepository
+        Map<Long, ChatRoomMember> existingMembersByUserId = chatRoomMemberRepository
                 .findByRoomRoomIdAndUserIdIn(room.getRoomId(), mentionedUserIds)
                 .stream()
-                .collect(Collectors.toMap(ChatRoomMember::getUserId, Function.identity()));
+                .collect(java.util.stream.Collectors.toMap(ChatRoomMember::getUserId, member -> member));
 
-        if (membersByUserId.size() != mentionedUserIds.size()) {
-            throw new RuntimeException("Mentioned users must be members of the chat room.");
+        List<ChatMessageMention> mentions = new ArrayList<>();
+        for (Long userId : mentionedUserIds) {
+            ChatRoomMember member = existingMembersByUserId.get(userId);
+
+            if (member == null) {
+                ChatUserProfileDto profile = chatUserProfileService.findProfile(userId)
+                        .orElseThrow(() -> new RuntimeException("Mentioned user profile not found."));
+                member = ensureMember(room, profile);
+            }
+
+            ChatMessageMention mention = new ChatMessageMention();
+            mention.setMessage(message);
+            mention.setRoom(room);
+            mention.setMentionedUserId(member.getUserId());
+            mention.setMentionedUsername(member.getUsername());
+            mention.setMentionedRole(member.getUserRole());
+            mention.setReadStatus(false);
+            mentions.add(mention);
         }
 
-        List<ChatMessageMention> mentions = mentionedUserIds.stream()
-                .map(userId -> {
-                    ChatRoomMember member = membersByUserId.get(userId);
-                    ChatMessageMention mention = new ChatMessageMention();
-                    mention.setMessage(message);
-                    mention.setRoom(room);
-                    mention.setMentionedUserId(member.getUserId());
-                    mention.setMentionedUsername(member.getUsername());
-                    mention.setMentionedRole(member.getUserRole());
-                    mention.setReadStatus(false);
-                    return mention;
-                })
-                .toList();
-
         return chatMessageMentionRepository.saveAll(mentions);
+    }
+
+    private void publishMentionEmails(ChatMessage message, ChatRoom room, List<ChatMessageMention> mentions) {
+        if (mentions.isEmpty()) {
+            return;
+        }
+
+        mentions.forEach(mention -> {
+            if ("ROLE_ADMIN".equals(mention.getMentionedRole())) {
+                publishAdminMentionEmails(message, room, mention);
+                return;
+            }
+
+            chatUserProfileService.findProfile(mention.getMentionedUserId(), mention.getMentionedRole())
+                    .filter(profile -> !isBlank(profile.email()))
+                    .ifPresent(profile -> publishMentionEmail(message, room, mention, profile));
+        });
+    }
+
+    private void publishMentionEmail(
+            ChatMessage message,
+            ChatRoom room,
+            ChatMessageMention mention,
+            ChatUserProfileDto profile
+    ) {
+        applicationEventPublisher.publishEvent(new EmailNotificationEvent(
+                UUID.randomUUID().toString(),
+                "CHAT_MENTIONED",
+                "CHAT_MENTIONED",
+                profile.userId(),
+                defaultValue(profile.role(), mention.getMentionedRole()),
+                profile.email(),
+                defaultValue(profile.displayName(), mention.getMentionedUsername()),
+                null,
+                "chat-service",
+                "CHAT_MESSAGE",
+                message.getMessageId(),
+                mentionEmailVariables(message, room, mention),
+                LocalDateTime.now()
+        ));
+    }
+
+    private void publishAdminMentionEmails(ChatMessage message, ChatRoom room, ChatMessageMention mention) {
+        adminRecipientEmails().forEach(adminEmail ->
+                applicationEventPublisher.publishEvent(new EmailNotificationEvent(
+                        UUID.randomUUID().toString(),
+                        "CHAT_MENTIONED",
+                        "CHAT_MENTIONED",
+                        mention.getMentionedUserId(),
+                        "ROLE_ADMIN",
+                        adminEmail,
+                        defaultValue(mention.getMentionedUsername(), "Admin"),
+                        "ADMIN",
+                        "chat-service",
+                        "CHAT_MESSAGE",
+                        message.getMessageId(),
+                        mentionEmailVariables(message, room, mention),
+                        LocalDateTime.now()
+                ))
+        );
+    }
+
+    private Map<String, String> mentionEmailVariables(ChatMessage message, ChatRoom room, ChatMessageMention mention) {
+        Map<String, String> variables = new LinkedHashMap<>();
+        variables.put("roomId", String.valueOf(room.getRoomId()));
+        variables.put("roomName", defaultValue(room.getRoomName(), "Chat"));
+        variables.put("messageId", String.valueOf(message.getMessageId()));
+        variables.put("senderName", defaultValue(message.getSenderUsername(), "Someone"));
+        variables.put("senderRole", defaultValue(message.getSenderRole(), "-"));
+        variables.put("mentionedName", defaultValue(mention.getMentionedUsername(), "User"));
+        variables.put("messagePreview", messagePreview(message.getMessage()));
+        return variables;
+    }
+
+    private List<String> adminRecipientEmails() {
+        if (isBlank(adminRecipients)) {
+            return List.of();
+        }
+
+        return Arrays.stream(adminRecipients.split(","))
+                .map(String::trim)
+                .filter(email -> !email.isBlank())
+                .distinct()
+                .toList();
+    }
+
+    private String messagePreview(String message) {
+        if (isBlank(message)) {
+            return "";
+        }
+
+        String normalized = message.trim();
+        return normalized.length() <= 180 ? normalized : normalized.substring(0, 180) + "...";
     }
 
     private ChatRoomDto toRoomDto(ChatRoom room) {
@@ -336,5 +462,50 @@ public class ChatService {
                 ),
                 member.getUserRole()
         );
+    }
+
+    private ChatRoomMemberDto toMemberDto(ChatUserProfileDto profile) {
+        return new ChatRoomMemberDto(
+                profile.userId(),
+                defaultValue(profile.displayName(), "User #" + profile.userId()),
+                defaultValue(profile.role(), "ROLE_USER")
+        );
+    }
+
+    private ChatRoomMember ensureMember(ChatRoom room, ChatUserProfileDto profile) {
+        return chatRoomMemberRepository.findByRoomRoomIdAndUserId(room.getRoomId(), profile.userId())
+                .map(member -> updateMemberIfNeeded(member, profile))
+                .orElseGet(() -> createMember(room, profile));
+    }
+
+    private ChatRoomMember updateMemberIfNeeded(ChatRoomMember member, ChatUserProfileDto profile) {
+        String displayName = defaultValue(profile.displayName(), member.getUsername());
+        String role = defaultValue(profile.role(), member.getUserRole());
+        boolean needsUpdate = !displayName.equals(member.getUsername()) || !role.equals(member.getUserRole());
+
+        if (!needsUpdate) {
+            return member;
+        }
+
+        member.setUsername(displayName);
+        member.setUserRole(role);
+        return chatRoomMemberRepository.save(member);
+    }
+
+    private ChatRoomMember createMember(ChatRoom room, ChatUserProfileDto profile) {
+        ChatRoomMember member = new ChatRoomMember();
+        member.setRoom(room);
+        member.setUserId(profile.userId());
+        member.setUsername(defaultValue(profile.displayName(), "User #" + profile.userId()));
+        member.setUserRole(defaultValue(profile.role(), "ROLE_USER"));
+        return chatRoomMemberRepository.save(member);
+    }
+
+    private String defaultValue(String value, String fallback) {
+        return isBlank(value) ? fallback : value.trim();
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
     }
 }
