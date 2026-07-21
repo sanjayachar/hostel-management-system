@@ -1,0 +1,187 @@
+package com.candidate.othercandidateservice.service;
+
+import com.candidate.othercandidateservice.client.grpc.AccommodationClient;
+import com.candidate.othercandidateservice.client.grpc.AuthClient;
+import com.candidate.othercandidateservice.common.enums.RoleEnum;
+import com.candidate.othercandidateservice.common.exception.ResourceNotFoundException;
+import com.candidate.othercandidateservice.common.util.Constants;
+import com.candidate.othercandidateservice.common.util.SecurityContextUtil;
+import com.candidate.othercandidateservice.dto.AccommodationRequestDto;
+import com.candidate.othercandidateservice.dto.CandidateDto;
+import com.candidate.othercandidateservice.dto.CreatedAuthUser;
+import com.candidate.othercandidateservice.dto.EmailNotificationEvent;
+import com.candidate.othercandidateservice.entity.Candidate;
+import com.candidate.othercandidateservice.mapper.CandidateMapper;
+import com.candidate.othercandidateservice.repository.CandidateRepo;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.Year;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class CandidateService {
+    private final CandidateRepo candidateRepo;
+    private final CandidateMapper candidateMapper;
+    private final AuthClient authClient;
+    private final AccommodationClient accommodationClient;
+    private final ApplicationEventPublisher applicationEventPublisher;
+
+    @Transactional
+    public void saveOrUpdateCandidate(@Valid CandidateDto candidateDto) {
+        if (candidateDto.getCandidateId() == null) {
+            registerCandidate(candidateDto);
+        } else {
+            updateCandidate(candidateDto);
+        }
+    }
+
+    public void registerCandidate(@Valid CandidateDto candidateDto) {
+        Long userId = null;
+        try {
+            CreatedAuthUser createdAuthUser = saveUserDetails(candidateDto);
+            Candidate candidate = candidateMapper.toEntityForSave(candidateDto);
+            userId = createdAuthUser.userId();
+            candidate.setUserId(userId);
+            candidateRepo.save(candidate);
+            EmailNotificationEvent emailEvent = new EmailNotificationEvent(
+                    UUID.randomUUID().toString(),
+                    "USER_CREATED",
+                    "USER_CREATED",
+                    userId,
+                    "ROLE_CANDIDATE",
+                    candidateDto.getEmail(),
+                    candidateDto.getFirstName() + " " + candidateDto.getLastName(),
+                    null,
+                    "other-candidate-service",
+                    "CANDIDATE",
+                    candidate.getCandidateId(),
+                    Map.of("username", candidateDto.getCandidateCode(),
+                            "temporaryPassword", createdAuthUser.temporaryPassword(),
+                            "instruction", "Please login using this temporary password and reset your password immediately."),
+                    LocalDateTime.now()
+            );
+            applicationEventPublisher.publishEvent(emailEvent);
+        } catch (Exception e) {
+            if (userId != null) {
+                try {
+                    authClient.deleteUser(userId);
+                    log.info("Rollback success for user {}", userId);
+                } catch (Exception rollbackEx) {
+                    log.error("Rollback failed for user {}", userId, rollbackEx);
+                }
+            }
+            throw new RuntimeException("Candidate registration failed", e);
+        }
+    }
+
+    public void updateCandidate(@Valid CandidateDto candidateDto) {
+        Candidate candidate = candidateRepo.findById(candidateDto.getCandidateId()).orElseThrow(() -> new RuntimeException("Candidate not found"));
+        candidate.setFirstName(candidateDto.getFirstName());
+        candidate.setLastName(candidateDto.getLastName());
+        candidate.setGender(candidateDto.getGender());
+        candidate.setDateOfBirth(candidateDto.getDateOfBirth());
+        candidate.setContactNumber(candidateDto.getContactNumber());
+        candidate.setEmail(candidateDto.getEmail());
+        candidate.setAddress(candidateDto.getAddress());
+        candidate.setCity(candidateDto.getCity());
+        candidate.setState(candidateDto.getState());
+        candidate.setPinCode(candidateDto.getPinCode());
+        candidate.setAppliedPost(candidateDto.getAppliedPost());
+        candidateRepo.save(candidate);
+    }
+
+    private CreatedAuthUser saveUserDetails(@Valid CandidateDto candidateDto) {
+        String rawPassword = generatePassword();
+        return authClient.createUser(
+                candidateDto.getCandidateCode(),
+                rawPassword,
+                RoleEnum.ROLE_CANDIDATE.name()
+        );
+    }
+
+    private String generatePassword() {
+        return UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    public List<CandidateDto> getCandidateList() {
+        return candidateRepo.findAll().stream().map(candidateMapper::toDto).collect(Collectors.toList());
+    }
+
+    public List<Candidate> getActiveCandidates() {
+        return candidateRepo.findAllByActiveFlag(Constants.ACTIVE);
+    }
+
+    public CandidateDto getCandidateById(Long candidateId) {
+        return candidateRepo.findByCandidateIdAndActiveFlag(candidateId, Constants.ACTIVE)
+                .map(candidateMapper::toDto)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate Not Found"));
+    }
+
+    public CandidateDto getCandidateByCandidateCode(String candidateCode) {
+        return candidateRepo.findByCandidateCodeAndActiveFlag(candidateCode, Constants.ACTIVE)
+                .map(candidateMapper::toDto)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate Not Found"));
+    }
+
+    public Optional<Candidate> getActiveCandidateByUserId(Long userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+
+        return candidateRepo.findFirstByUserIdAndActiveFlagOrderByCandidateIdDesc(userId, Constants.ACTIVE);
+    }
+
+    public List<AccommodationRequestDto> getCandidateAccommodationRequest(RoleEnum roleEnum) {
+        return accommodationClient.getRequests(roleEnum.name(), SecurityContextUtil.getUserId());
+    }
+
+    public String getNextCandidateCode() {
+        String prefix = "CAND" + Year.now().getValue();
+        int maxSuffix = candidateRepo.findAllByCandidateCodeStartingWith(prefix).stream()
+                .map(Candidate::getCandidateCode)
+                .mapToInt(candidateCode -> extractSuffix(candidateCode, prefix))
+                .max()
+                .orElse(0);
+        int nextSuffix = maxSuffix + 1;
+        return prefix + String.format("%03d", nextSuffix);
+    }
+
+    private int extractSuffix(String value, String prefix) {
+        if (value == null || !value.startsWith(prefix)) {
+            return 0;
+        }
+
+        String suffix = value.substring(prefix.length());
+        if (suffix.isBlank()) {
+            return 0;
+        }
+
+        try {
+            return Integer.parseInt(suffix);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
+    }
+
+    public ResponseEntity<?> saveOrUpdateAccommodation(@Valid AccommodationRequestDto accommodationRequestDto) {
+        String token = SecurityContextUtil.getToken();
+        Long userId = SecurityContextUtil.getUserId();
+        String userRole = SecurityContextUtil.getRole();
+        accommodationRequestDto.setUserId(userId);
+        accommodationRequestDto.setUserRole(RoleEnum.valueOf(userRole));
+        return ResponseEntity.ok(accommodationClient.saveRequest(accommodationRequestDto, token));
+    }
+}

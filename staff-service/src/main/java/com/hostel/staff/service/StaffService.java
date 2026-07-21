@@ -1,0 +1,189 @@
+package com.hostel.staff.service;
+
+import com.hostel.staff.client.grpc.AccommodationClient;
+import com.hostel.staff.client.grpc.AuthClient;
+import com.hostel.staff.client.grpc.StudentDetailsClient;
+import com.hostel.staff.common.enums.RoleEnum;
+import com.hostel.staff.common.exception.ResourceNotFoundException;
+import com.hostel.staff.common.util.Constants;
+import com.hostel.staff.common.util.SecurityContextUtil;
+import com.hostel.staff.dto.AccommodationRequestDto;
+import com.hostel.staff.dto.CreatedAuthUser;
+import com.hostel.staff.dto.EmailNotificationEvent;
+import com.hostel.staff.dto.StaffDto;
+import com.hostel.staff.dto.StudentsDto;
+import com.hostel.staff.entity.Staff;
+import com.hostel.staff.mapper.StaffMapper;
+import com.hostel.staff.repository.StaffRepo;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.time.Year;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class StaffService {
+    private final StaffMapper staffMapper;
+    private final StaffRepo staffRepo;
+    private final AuthClient authClient;
+    private final AccommodationClient accommodationClient;
+    private final StudentDetailsClient studentDetailsClient;
+    private final ApplicationEventPublisher applicationEventPublisher;
+
+    @Transactional
+    public void saveOrUpdateStaff(@Valid StaffDto staffDto) {
+        if (staffDto.getStaffId()==null) {
+            registerStaff(staffDto);
+        } else {
+            updateStaff(staffDto);
+        }
+    }
+    public void registerStaff(@Valid StaffDto staffDto) {
+        Long userId = null;
+        try {
+            CreatedAuthUser createdAuthUser = saveUserDetails(staffDto);
+            Staff staff = staffMapper.toEntityForSave(staffDto);
+            userId = createdAuthUser.userId();
+            staff.setUserId(userId);
+            staffRepo.save(staff);
+            EmailNotificationEvent emailEvent = new EmailNotificationEvent(
+                    UUID.randomUUID().toString(),
+                    "USER_CREATED",
+                    "USER_CREATED",
+                    userId,
+                    "ROLE_STAFF",
+                    staffDto.getEmail(),
+                    staffDto.getFirstName() + " " + staffDto.getLastName(),
+                    null,
+                    "staff-service",
+                    "STAFF",
+                    staff.getStaffId(),
+                    Map.of(
+                            "username", staffDto.getEmployeeCode(),
+                            "temporaryPassword", createdAuthUser.temporaryPassword(),
+                            "instruction", "Please login using this temporary password and reset your password immediately."
+                    ),
+                    LocalDateTime.now()
+            );
+            applicationEventPublisher.publishEvent(emailEvent);
+        } catch (Exception e) {
+            if (userId != null) {
+                try {
+                    authClient.deleteUser(userId);
+                    log.info("Rollback success for user {}", userId);
+                } catch (Exception rollbackEx) {
+                    log.error("Rollback failed for user {}", userId, rollbackEx);
+                }
+            }
+            throw new RuntimeException("Staff registration failed", e);
+        }
+        /* future mail service */
+    }
+
+    public void updateStaff(@Valid StaffDto staffDto) {
+        Staff staff = staffRepo.findById(staffDto.getStaffId()).orElseThrow(()->new RuntimeException("Student Now Found"));
+        staff.setFirstName(staffDto.getFirstName());
+        staff.setLastName(staffDto.getLastName());
+        staff.setGender(staffDto.getGender());
+        staff.setDateOfBirth(staffDto.getDateOfBirth());
+        staff.setContactNumber(staffDto.getContactNumber());
+        staff.setEmail(staffDto.getEmail());
+        staff.setAddress(staffDto.getAddress());
+        staff.setDesignation(staffDto.getDesignation());
+        staff.setDepartment(staffDto.getDepartment());
+        staff.setDateOfJoining(staffDto.getDateOfJoining());
+        staffRepo.save(staff);
+    }
+
+    private CreatedAuthUser saveUserDetails(@Valid StaffDto staffDto) {
+        String rawPassword = generatePassword();
+        return authClient.createUser(
+                staffDto.getEmployeeCode(),
+                rawPassword,
+                RoleEnum.ROLE_STAFF.name()
+        );
+    }
+
+    private String generatePassword() {
+        return UUID.randomUUID().toString().substring(0, 8);
+    }
+
+    public List<StaffDto> getAllStaffs() {
+        return staffRepo.findAll().stream().map(staffMapper::toDto).collect(Collectors.toList());
+    }
+
+    public List<Staff> getActiveStaffs() {
+        return staffRepo.findAllByActiveFlag(Constants.ACTIVE);
+    }
+
+    public String getNextEmployeeCode() {
+        String prefix = "EMP" + Year.now().getValue();
+        int maxSuffix = staffRepo.findAllByEmployeeCodeStartingWith(prefix).stream()
+                .map(Staff::getEmployeeCode)
+                .mapToInt(employeeCode -> extractSuffix(employeeCode, prefix))
+                .max()
+                .orElse(0);
+        int nextSuffix = maxSuffix + 1;
+        return prefix + String.format("%03d", nextSuffix);
+    }
+
+    private int extractSuffix(String value, String prefix) {
+        if (value == null || !value.startsWith(prefix)) {
+            return 0;
+        }
+
+        String suffix = value.substring(prefix.length());
+        if (suffix.isBlank()) {
+            return 0;
+        }
+
+        try {
+            return Integer.parseInt(suffix);
+        } catch (NumberFormatException ex) {
+            return 0;
+        }
+    }
+
+    public StaffDto getStaffById(Long staffId) {
+        StaffDto staffDto = staffRepo.findByStaffIdAndActiveFlag(staffId, Constants.ACTIVE).map(staffMapper::toDto).orElseThrow(()->new ResourceNotFoundException("Staff not found."));
+        return staffDto;
+    }
+
+    StaffDto getStaffByEmployeeCode(String username) {
+        return staffRepo.findByEmployeeCodeAndActiveFlag(username, Constants.ACTIVE).map(staffMapper::toDto).orElseThrow(()->new ResourceNotFoundException("Staff Not Found"));
+    }
+
+    public Optional<Staff> getActiveStaffByUserId(Long userId) {
+        if (userId == null) {
+            return Optional.empty();
+        }
+
+        return staffRepo.findFirstByUserIdAndActiveFlagOrderByStaffIdDesc(userId, Constants.ACTIVE);
+    }
+
+    public List<AccommodationRequestDto> getStaffsAccommodationRequest(RoleEnum roleEnum) {
+        return accommodationClient.getRequests(roleEnum.name(), SecurityContextUtil.getUserId());
+    }
+
+    public void saveOrUpdateAccommodation(@Valid AccommodationRequestDto accommodationRequestDto) {
+        String token = SecurityContextUtil.getToken();
+        Long userId = SecurityContextUtil.getUserId();
+        String userRole = SecurityContextUtil.getRole();
+        accommodationRequestDto.setUserId(userId);
+        accommodationRequestDto.setUserRole(RoleEnum.valueOf(userRole));
+        ResponseEntity.ok(accommodationClient.saveRequest(accommodationRequestDto, token));
+    }
+}

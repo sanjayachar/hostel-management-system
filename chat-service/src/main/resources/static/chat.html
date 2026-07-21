@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chat Test</title>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+</head>
+<body>
+<h3>Hostel Chat Test</h3>
+
+<label>
+    JWT
+    <input type="text" id="token" style="width: 700px"/>
+</label>
+<button onclick="connect()">Connect</button>
+
+<div>
+    <p>Room: <span id="room"></span></p>
+    <input type="text" id="message"/>
+    <button onclick="sendMessage()">Send</button>
+</div>
+
+<ul id="messages"></ul>
+
+<script>
+    let stompClient = null;
+    let activeRoomId = null;
+
+    async function connect() {
+        const token = document.getElementById('token').value;
+
+        const roomsResponse = await fetch('/chat-service-api/chat/rooms', {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+        const rooms = await roomsResponse.json();
+        activeRoomId = rooms[0].roomId;
+        document.getElementById('room').innerText = `${rooms[0].roomName} (${activeRoomId})`;
+
+        const historyResponse = await fetch(`/chat-service-api/chat/rooms/${activeRoomId}/messages`, {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+        const history = await historyResponse.json();
+        history.content.forEach(addMessage);
+
+        const socket = new SockJS('/chat-service-api/ws-chat');
+        stompClient = Stomp.over(socket);
+        stompClient.connect({Authorization: `Bearer ${token}`}, function () {
+            stompClient.subscribe(`/topic/chat/rooms/${activeRoomId}`, function (message) {
+                addMessage(JSON.parse(message.body));
+            });
+        });
+    }
+
+    function sendMessage() {
+        const message = document.getElementById('message').value;
+        stompClient.send(`/app/chat/rooms/${activeRoomId}/send`, {}, JSON.stringify({message}));
+        document.getElementById('message').value = '';
+    }
+
+    function addMessage(msg) {
+        const li = document.createElement('li');
+        li.innerText = `${msg.senderUsername}: ${msg.message}`;
+        document.getElementById('messages').appendChild(li);
+    }
+</script>
+</body>
+</html>

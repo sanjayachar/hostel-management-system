@@ -1,0 +1,52 @@
+jwt:
+  secret: RrURV5twHjsX+LPK3MfI67swocN972ymHopqr3rAANw=
+  expiration: 86400000
+
+server:
+  port: 8082
+  servlet:
+    context-path: /accomm-service-api
+hostel:
+  audit:
+    topic: hostel.audit.logs
+  email:
+    topic: hostel.email.notifications
+    admin-recipients: sanjayachar2k01@gmail.com
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/hostel_management_system
+    username: postgres
+    password: $@nju#29
+  data:
+    redis:
+      host: localhost
+      port: 6379
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  kafka:
+    bootstrap-servers: localhost:29092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      properties:
+        spring.json.add.type.headers: false
+
+grpc:
+  server:
+    port : 9092
+    security:
+      enabled: false
+  client:
+    student-service:
+      address: static://localhost:9094
+      negotiationType: plaintext
+    staff-service:
+      address: static://localhost:9091
+      negotiationType: plaintext
+    other-candidate-service:
+      address: static://localhost:9095
+      negotiationType: plaintext

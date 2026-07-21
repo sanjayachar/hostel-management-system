@@ -1,3 +1,13 @@
+jwt:
+  secret: RrURV5twHjsX+LPK3MfI67swocN972ymHopqr3rAANw=
+  expiration: 86400000
+server:
+  port: 8083
+  servlet:
+    context-path: /api
+logging:
+  level:
+    org.springframework.security: DEBUG
 spring:
   application:
     name: hostel-managment-system
