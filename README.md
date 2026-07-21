@@ -40,7 +40,7 @@ The root `src/` directory contains an older monolithic Spring Boot implementatio
 ## Main Features
 
 - Role-based login for `ROLE_ADMIN`, `ROLE_STUDENT`, `ROLE_STAFF`, and `ROLE_CANDIDATE`
-- JWT authorization with Redis-backed token version tracking
+- JWT authorization with Redis-backed token version tracking.
 - Public registration flows for students and candidates
 - Admin staff creation and staff/student/candidate listing
 - Hostel and room management
